@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO)
 
 import sys
 import re
-import csv
+import pickle
 import numpy as np
 import h5py
 from tqdm import trange
@@ -31,33 +31,8 @@ def main(argv):
         BATCH_SIZE = 256
 
 
-    tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased',
-                                              do_lower_case=False,
-                                              max_len=1024,
-                                              do_basic_tokenize=True,
-                                              cache_dir='./checkpoints/')
-    id_word_list = []
-    with open('../../dataset/orig_text_segment{}'.format(SPLIT_NO)) as f:
-        reader = csv.reader(f, delimiter=',')
-        for target in reader:
-            key = int(target[0])
-            value = ','.join(target[1:])
-
-            # remove url, mention, hashtag, special token used in BERT
-            value = match.sub("", value)
-            # put special char for BERT
-            value = '[CLS] ' + value[:280] + ' [SEP]'
-
-            # tokenize
-            tokenized_text = tokenizer.tokenize(value)
-
-           # convert to index
-            indexes = tokenizer.convert_tokens_to_ids(tokenized_text)
-
-            # save it to array
-            id_word_list.append([key, indexes])
-            #if len(id_word_list) > 5000:
-            #    break
+    with open('../../dataset/feature_text_segment{}.pickle'.format(SPLIT_NO), 'rb') as f:
+        id_word_list = pickle.load(f)
 
     # Load pre-trained model (weights)
     model = BertModel.from_pretrained('bert-base-multilingual-cased',
@@ -80,7 +55,7 @@ def main(argv):
 
         # group each of them
         id_list = [_[0] for _ in batch_list]
-        indexed_tokens = [_[1] for _ in batch_list]
+        indexed_tokens = [_[2] for _ in batch_list]
 
         tokens_tensor = torch.nn.utils.rnn.pad_sequence([torch.tensor(_) for _ in indexed_tokens], batch_first=True)
         ## cut down the tensor

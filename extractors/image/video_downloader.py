@@ -39,7 +39,7 @@ def main(argv):
             key_link_dict[key] = vid_url
     sorted_list = sorted(key_link_dict.items(), key=operator.itemgetter(0))
 
-    for key, single_url in tqdm(sorted_list):
+    for key, single_url in tqdm(sorted_list, ncols=60):
         command = VIDEO_TEMPLATE.format(single_url)
         process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
         process.wait()
