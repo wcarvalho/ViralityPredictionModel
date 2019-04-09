@@ -13,6 +13,8 @@ import re
 import csv
 import pickle
 from tqdm import trange
+from unidecode import unidecode
+
 
 match = re.compile(r'(?:\@|https?\://)\S+|\[CLS\]|\[SEP\]|\#')
 
@@ -44,8 +46,10 @@ def main(argv):
 
             # remove url, mention, hashtag, special token used in BERT
             value = match.sub("", value)
+            # remove non-ascii stuffs
+            value = unidecode(value)
             # put special char for BERT
-            value = '[CLS] ' + value[:280] + ' [SEP]'
+            value = '[CLS] ' + value[:150] + ' [SEP]'
 
             # tokenize
             tokenized_text = tokenizer.tokenize(value)
@@ -58,7 +62,7 @@ def main(argv):
             #if len(id_word_list) > 5000:
             #    break
 
-    with open('../../dataset/feature_text_segment{}.pickle'.format(SPLIT_NO), 'wb') as f:
+    with open('../../dataset/feature_text_segment{}_unidecode.pickle'.format(SPLIT_NO), 'wb') as f:
         pickle.dump(id_word_list, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 

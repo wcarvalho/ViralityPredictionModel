@@ -101,7 +101,7 @@ def main(argv):
         value_list = pooled_output.data.cpu().numpy()
         for each_key, each_value in zip(id_list, value_list):
             grp = hf.create_group(str(each_key))
-            grp.create_dataset('vector', data=each_value)
+            grp.create_dataset('text', data=each_value)
     hf.close()
 
 

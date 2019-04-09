@@ -21,7 +21,7 @@ match = re.compile(r'(?:\@|https?\://)\S+|\[CLS\]|\[SEP\]|\#')
 
 def main(argv):
     if len(argv) not in [2,3]:
-        print('wrong command. It should be python bery.py SPLIT_NO [BATCH_SIZE]')
+        print('wrong command. It should be python bert_with_feature.py SPLIT_NO [BATCH_SIZE]')
         return
 
     SPLIT_NO = int(argv[1])
@@ -31,7 +31,7 @@ def main(argv):
         BATCH_SIZE = 256
 
 
-    with open('../../dataset/feature_text_segment{}.pickle'.format(SPLIT_NO), 'rb') as f:
+    with open('../../dataset/feature_text_segment{}_unidecode.pickle'.format(SPLIT_NO), 'rb') as f:
         id_word_list = pickle.load(f)
 
     # Load pre-trained model (weights)
@@ -44,7 +44,6 @@ def main(argv):
     for param in model.parameters():
         param.requires_grad = False
     model.eval()
-
 
     hf = h5py.File('../../dataset/text_features{}.h5'.format(SPLIT_NO), 'w')
     answer_dict = {}
@@ -76,7 +75,7 @@ def main(argv):
         value_list = pooled_output.data.cpu().numpy()
         for each_key, each_value in zip(id_list, value_list):
             grp = hf.create_group(str(each_key))
-            grp.create_dataset('vector', data=each_value)
+            grp.create_dataset('text', data=each_value)
     hf.close()
 
 
