@@ -62,9 +62,14 @@ def main(argv):
     # Load pre-trained model (weights)
     model = BertModel.from_pretrained('bert-base-multilingual-cased',
                                       cache_dir='./checkpoints/')
-    model.eval()
     # If you have a GPU, put everything on cuda
     model.to('cuda')
+
+    # disable every gradient
+    for param in model.parameters():
+        param.requires_grad = False
+    model.eval()
+
 
     hf = h5py.File('../../dataset/text_features{}.h5'.format(SPLIT_NO), 'w')
     answer_dict = {}
@@ -84,10 +89,11 @@ def main(argv):
         tokens_tensor = tokens_tensor.to('cuda')
         segments_tensors = torch.zeros_like(tokens_tensor)
 
+        # remove gradient once again for a sanity check
         model.zero_grad()
         # Predict hidden states features for each layer
         with torch.no_grad():
-            _, pooled_output = model(input_ids=tokens_tensor,
+            _, pooled_output = model.forward(input_ids=tokens_tensor,
                                      token_type_ids=segments_tensors,
                                      output_all_encoded_layers=False)
 

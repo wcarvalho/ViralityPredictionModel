@@ -38,7 +38,7 @@ def main(argv):
 
     item_dir = os.path.join(CACHE_DIR, '{}_{}'.format(FROM_LINE, TO_LINE))
     os.makedirs(item_dir)
-    for key, single_url in tqdm(sorted_list):
+    for key, single_url in tqdm(sorted_list, ncols=60):
         _, ext = os.path.splitext(single_url)
 
         output_path = os.path.join(item_dir, '{}{}'.format(key, ext))
