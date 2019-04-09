@@ -84,6 +84,7 @@ def main(argv):
         tokens_tensor = tokens_tensor.to('cuda')
         segments_tensors = torch.zeros_like(tokens_tensor)
 
+        model.zero_grad()
         # Predict hidden states features for each layer
         with torch.no_grad():
             _, pooled_output = model(input_ids=tokens_tensor,
