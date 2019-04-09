@@ -46,7 +46,7 @@ def main(argv):
             # remove url, mention, hashtag, special token used in BERT
             value = match.sub("", value)
             # put special char for BERT
-            value = '[CLS] ' + value + ' [SEP]'
+            value = '[CLS] ' + value[:280] + ' [SEP]'
 
             # tokenize
             tokenized_text = tokenizer.tokenize(value)
@@ -78,8 +78,8 @@ def main(argv):
         indexed_tokens = [_[1] for _ in batch_list]
 
         tokens_tensor = torch.nn.utils.rnn.pad_sequence([torch.tensor(_) for _ in indexed_tokens], batch_first=True)
-        # cut down the tensor
-        tokens_tensor = tokens_tensor[:, :256]
+        ## cut down the tensor
+        #tokens_tensor = tokens_tensor[:, :256]
         # If you have a GPU, put everything on cuda
         tokens_tensor = tokens_tensor.to('cuda')
         segments_tensors = torch.zeros_like(tokens_tensor)
