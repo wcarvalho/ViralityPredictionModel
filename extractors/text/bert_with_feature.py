@@ -10,10 +10,12 @@ logging.basicConfig(level=logging.INFO)
 
 import sys
 import re
+import glob
+import os
 import pickle
 import numpy as np
 import h5py
-from tqdm import trange
+from tqdm import tqdm
 
 match = re.compile(r'(?:\@|https?\://)\S+|\[CLS\]|\[SEP\]|\#')
 
@@ -31,8 +33,8 @@ def main(argv):
         BATCH_SIZE = 256
 
 
-    with open('../../dataset/feature_text_segment{}_unidecode.pickle'.format(SPLIT_NO), 'rb') as f:
-        id_word_list = pickle.load(f)
+    base_folder = '../../dataset/feature_text_segment{}'.format(SPLIT_NO)
+    list_of_items = glob.glob(base_folder+'/*.pickle')
 
     # Load pre-trained model (weights)
     model = BertModel.from_pretrained('bert-base-multilingual-cased',
@@ -45,10 +47,12 @@ def main(argv):
         param.requires_grad = False
     model.eval()
 
+    # create one large h5 file for summary
     hf = h5py.File('../../dataset/text_features{}.h5'.format(SPLIT_NO), 'w')
-    answer_dict = {}
-    for idx in trange(((len(id_word_list) + BATCH_SIZE - 1) // BATCH_SIZE), ncols=60):
-        batch_list = id_word_list[idx * BATCH_SIZE:(idx + 1) * BATCH_SIZE]
+
+    for single_file_path in tqdm(list_of_items, ncols=60):
+        with open(single_file_path, 'rb') as f:
+            batch_list = pickle.load(f)
         if len(batch_list) == 0:
             continue
 

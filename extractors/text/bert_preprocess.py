@@ -12,7 +12,8 @@ import sys
 import re
 import csv
 import pickle
-from tqdm import trange
+import os
+from tqdm import trange, tqdm
 from unidecode import unidecode
 
 
@@ -40,13 +41,13 @@ def main(argv):
     id_word_list = []
     with open('../../dataset/orig_text_segment{}'.format(SPLIT_NO)) as f:
         reader = csv.reader(f, delimiter=',')
-        for target in reader:
+        for target in tqdm(reader, ncols=60, total=11500000):
             key = int(target[0])
             value = ','.join(target[1:])
 
             # remove url, mention, hashtag, special token used in BERT
             value = match.sub("", value)
-            # remove non-ascii stuffs
+            # replace non-ascii stuffs to ascii (emoji will be removed)
             value = unidecode(value)
             # put special char for BERT
             value = '[CLS] ' + value[:150] + ' [SEP]'
@@ -54,7 +55,7 @@ def main(argv):
             # tokenize
             tokenized_text = tokenizer.tokenize(value)
 
-           # convert to index
+            # convert to index
             indexes = tokenizer.convert_tokens_to_ids(tokenized_text)
 
             # save it to array
@@ -62,9 +63,16 @@ def main(argv):
             #if len(id_word_list) > 5000:
             #    break
 
-    with open('../../dataset/feature_text_segment{}_unidecode.pickle'.format(SPLIT_NO), 'wb') as f:
-        pickle.dump(id_word_list, f, protocol=pickle.HIGHEST_PROTOCOL)
 
+    base_dir = '../../dataset/feature_text_segment{}'.format(SPLIT_NO)
+    os.makedirs(base_dir)
+
+    for idx in trange(((len(id_word_list) + BATCH_SIZE - 1) // BATCH_SIZE), ncols=60):
+        batch_list = id_word_list[idx * BATCH_SIZE:(idx + 1) * BATCH_SIZE]
+        if len(batch_list) == 0:
+            continue
+        with open(os.path.join(base_dir, '{:06d}.pickle'.format(idx)), 'wb') as f:
+            pickle.dump(batch_list, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 if __name__ == "__main__":
     main(sys.argv)
