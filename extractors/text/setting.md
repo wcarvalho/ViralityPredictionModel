@@ -22,3 +22,9 @@ source activate bert
 ## Dataset Folder setting
 ../../dataset (root folder)
 ./checkpoints (current folder)
+
+
+## Specific details
+batch_size = 512
+max_word_piece = 128
+Take the very last hidden layer of '[CLS]'
