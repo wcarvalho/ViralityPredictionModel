@@ -26,13 +26,13 @@ def main(argv):
         return
 
     FROM_LINE = int(argv[1])
-    NUM_LINE = int(argv[2])
+    TO_LINE = int(argv[2])
 
     key_link_dict = {}
     with open('../../orig_video_link.csv') as f:
         reader = csv.reader(f, delimiter=',')
         for idx, target in enumerate(reader):
-            if idx >= FROM_LINE + NUM_LINE or idx < FROM_LINE:
+            if (idx >= TO_LINE) or (idx < FROM_LINE):
                 continue
             key = int(target[0])
             vid_url = target[2]
@@ -53,7 +53,7 @@ def main(argv):
                 moving_target.append(result_file.decode('ascii'))
 
         if len(moving_target) > 0:
-            item_dir = os.path.join(CACHE_DIR, '{}_{}'.format(FROM_LINE, NUM_LINE), str(key))
+            item_dir = os.path.join(CACHE_DIR, '{}_{}'.format(FROM_LINE, TO_LINE), str(key))
             os.makedirs(item_dir)
             for single_item in moving_target:
                 shutil.move(single_item, os.path.join(item_dir, single_item))
