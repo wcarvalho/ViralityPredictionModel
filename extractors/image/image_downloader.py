@@ -14,7 +14,7 @@ import shutil
 #TOTAL_VID = 2935479
 #TOTAL_IMG = 10837498
 IMAGE_EXT = ['png', 'jpg']
-CACHE_DIR = './'
+CACHE_DIR = '/data/yunseokj/mining/image_cache/'
 IMAGE_TEMPLATE = 'wget --quiet -O {} {}'
 
 def main(argv):
@@ -41,7 +41,7 @@ def main(argv):
     for key, single_url in tqdm(sorted_list):
         _, ext = os.path.splitext(single_url)
 
-        output_path = os.path.join(item_dir, '{}{}'.foramt(key, ext))
+        output_path = os.path.join(item_dir, '{}{}'.format(key, ext))
         command = IMAGE_TEMPLATE.format(output_path, single_url)
         process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
         process.wait()
