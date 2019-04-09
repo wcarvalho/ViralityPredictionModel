@@ -7,7 +7,7 @@ set of rows that contains r_pid, r_uid, r_t, p_pid, p_uid, p_t, c_pid, c_uid, c_
 
 ### 2. Image array
 
-(key,value dictionary, created with hdf5 format):  key=r_pid, value={"vis": image or video_vector, "label": image/video/(gif?)}
+(key,value dictionary, created with hdf5 format):  key=r_pid, value={"vis": image or video_vector, "label": image/video}
 
 ### 3. Text array
 
