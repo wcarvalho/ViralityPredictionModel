@@ -31,7 +31,7 @@ def main(argv):
         BATCH_SIZE = 256
 
 
-    with open('../../dataset/feature_text_segment{}'.format(SPLIT_NO), 'rb') as f:
+    with open('../../dataset/feature_text_segment{}.pickle'.format(SPLIT_NO), 'rb') as f:
         id_word_list = pickle.load(f)
 
     # Load pre-trained model (weights)

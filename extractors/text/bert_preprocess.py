@@ -58,7 +58,7 @@ def main(argv):
             #if len(id_word_list) > 5000:
             #    break
 
-    with open('../../dataset/feature_text_segment{}'.format(SPLIT_NO), 'wb') as f:
+    with open('../../dataset/feature_text_segment{}.pickle'.format(SPLIT_NO), 'wb') as f:
         pickle.dump(id_word_list, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 
