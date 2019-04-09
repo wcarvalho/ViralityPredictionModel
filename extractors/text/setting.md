@@ -25,6 +25,6 @@ source activate bert
 
 
 ## Specific details
-batch_size = 512
-max_word_piece = 128
+batch_size = 256
+max_word_piece = 256
 Take the very last hidden layer of '[CLS]'
