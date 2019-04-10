@@ -10,7 +10,7 @@ import glob
 import numpy as np
 import operator
 
-BUCKET_BASE = 300000
+BUCKET_BASE = 50000
 
 def main(argv):
     word_feature_dict = {}
