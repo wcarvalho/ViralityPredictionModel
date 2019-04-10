@@ -14,7 +14,7 @@ BUCKET_BASE = 2000
 
 def main(argv):
     word_feature_dict = {}
-    write_dir = '/mnt/brain4/datasets/Twitter/final/words/'
+    write_dir = '/mnt/brain4/datasets/Twitter/final/'
     for split_no in range(4):
         base_dir = '../../dataset/bert_text_output{}'.format(split_no)
         list_of_items = glob.glob(base_dir+'/*.npz')
