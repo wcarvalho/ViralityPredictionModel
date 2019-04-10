@@ -1,6 +1,6 @@
 # BERT-based tokenizer
 
-## Environment Setup for BERT Extractor
+## Environment Setup for Image/Video Extractor
 ```
 conda create --name downloader -y
 source activate downloader
@@ -10,7 +10,7 @@ conda install -c conda-forge python=3.6.4 numba ffmpeg -y
 conda install -c anaconda cudatoolkit=8.0 cudnn=7.0 -y
 conda install pytorch torchvision -c pytorch -y
 pip install requests gpustat tensorboardX visdom ipdb pudb tqdm h5py
-pp install --upgrade youtube-dl
+pip install --upgrade youtube-dl
 ```
 
 ## Dataset Folder setting
@@ -21,7 +21,7 @@ pp install --upgrade youtube-dl
 ## Specific details
 For downloading video, I use 'youtube-dl' which downloads file to the current folder only.
 So, for downloading video, I need to create a subfolder to execute it.
-I run the video downloader with 16 cores
+I run the video/image downloader with 16 cores
 
 
 
