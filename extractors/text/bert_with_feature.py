@@ -27,10 +27,11 @@ def main(argv):
         return
 
     SPLIT_NO = int(argv[1])
+    BATCH_SIZE = 256
     if len(argv) == 3:
-        BATCH_SIZE = int(argv[2])
+        START_FROM = int(argv[2])
     else:
-        BATCH_SIZE = 256
+        START_FROM = 0
 
 
     base_folder = '../../dataset/feature_text_segment{}'.format(SPLIT_NO)
@@ -54,7 +55,7 @@ def main(argv):
     # create one large h5 file for summary
     #hf = h5py.File('../../dataset/text_features{}.h5'.format(SPLIT_NO), 'w')
 
-    for file_id in trange(num_feature_inputs, ncols=60):
+    for file_id in trange(START_FROM, num_feature_inputs, ncols=60):
         with open(os.path.join(base_folder, '{:06d}.pickle'.format(file_id)), 'rb') as f:
             batch_list = pickle.load(f)
         if len(batch_list) == 0:
