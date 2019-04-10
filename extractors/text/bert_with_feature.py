@@ -15,7 +15,7 @@ import os
 import pickle
 import numpy as np
 import h5py
-from tqdm import tqdm
+from tqdm import tqdm, trange
 
 match = re.compile(r'(?:\@|https?\://)\S+|\[CLS\]|\[SEP\]|\#')
 
@@ -34,7 +34,11 @@ def main(argv):
 
 
     base_folder = '../../dataset/feature_text_segment{}'.format(SPLIT_NO)
+    output_folder = '../../dataset/bert_text_output{}'.format(SPLIT_NO)
+    os.makedirs(output_folder)
     list_of_items = glob.glob(base_folder+'/*.pickle')
+    num_feature_inputs = len(list_of_items)
+    list_of_items.clear()
 
     # Load pre-trained model (weights)
     model = BertModel.from_pretrained('bert-base-multilingual-cased',
@@ -48,10 +52,10 @@ def main(argv):
     model.eval()
 
     # create one large h5 file for summary
-    hf = h5py.File('../../dataset/text_features{}.h5'.format(SPLIT_NO), 'w')
+    #hf = h5py.File('../../dataset/text_features{}.h5'.format(SPLIT_NO), 'w')
 
-    for single_file_path in tqdm(list_of_items, ncols=60):
-        with open(single_file_path, 'rb') as f:
+    for file_id in trange(num_feature_inputs, ncols=60):
+        with open(os.path.join(base_folder, '{:06d}.pickle'.format(file_id)), 'rb') as f:
             batch_list = pickle.load(f)
         if len(batch_list) == 0:
             continue
@@ -59,8 +63,10 @@ def main(argv):
         # group each of them
         id_list = [_[0] for _ in batch_list]
         indexed_tokens = [_[2] for _ in batch_list]
+        batch_list.clear()
 
         tokens_tensor = torch.nn.utils.rnn.pad_sequence([torch.tensor(_) for _ in indexed_tokens], batch_first=True)
+        indexed_tokens.clear()
         ## cut down the tensor
         #tokens_tensor = tokens_tensor[:, :256]
         # If you have a GPU, put everything on cuda
@@ -77,10 +83,12 @@ def main(argv):
 
             # pooled_output: [batch_size, hidden_size (768)]
         value_list = pooled_output.data.cpu().numpy()
-        for each_key, each_value in zip(id_list, value_list):
-            grp = hf.create_group(str(each_key))
-            grp.create_dataset('text', data=each_value)
-    hf.close()
+        np.savez(os.path.join(output_folder, '{:06d}.npz'.format(file_id)), pid=np.array(id_list), value=value_list)
+        id_list.clear()
+        #for each_key, each_value in zip(id_list, value_list):
+        #    grp = hf.create_group(str(each_key))
+        #    grp.create_dataset('text', data=each_value)
+    #hf.close()
 
 
 if __name__ == "__main__":
