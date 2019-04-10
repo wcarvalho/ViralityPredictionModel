@@ -9,16 +9,11 @@ import logging
 logging.basicConfig(level=logging.INFO)
 
 import sys
-import re
 import glob
 import os
 import pickle
 import numpy as np
-import h5py
 from tqdm import tqdm, trange
-
-match = re.compile(r'(?:\@|https?\://)\S+|\[CLS\]|\[SEP\]|\#')
-
 
 
 def main(argv):
@@ -52,9 +47,6 @@ def main(argv):
         param.requires_grad = False
     model.eval()
 
-    # create one large h5 file for summary
-    #hf = h5py.File('../../dataset/text_features{}.h5'.format(SPLIT_NO), 'w')
-
     for file_id in trange(START_FROM, num_feature_inputs, ncols=60):
         with open(os.path.join(base_folder, '{:06d}.pickle'.format(file_id)), 'rb') as f:
             batch_list = pickle.load(f)
@@ -86,10 +78,6 @@ def main(argv):
         value_list = pooled_output.data.cpu().numpy()
         np.savez(os.path.join(output_folder, '{:06d}.npz'.format(file_id)), pid=np.array(id_list), value=value_list)
         id_list.clear()
-        #for each_key, each_value in zip(id_list, value_list):
-        #    grp = hf.create_group(str(each_key))
-        #    grp.create_dataset('text', data=each_value)
-    #hf.close()
 
 
 if __name__ == "__main__":
