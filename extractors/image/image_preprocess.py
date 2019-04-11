@@ -57,7 +57,16 @@ def main(argv):
                 continue
             except Exception:
                 continue
-            im = im.convert('RGB')
+            if im.mode == 'P':
+                im = im.convert('RGBA')
+
+            if im.mode in ('RGBA', 'LA'):
+                background = Image.new(im.mode[:-1], im.size, (255, 255, 255))
+                background.paste(im, im.split()[-1])
+                im = background
+                im = im.convert('RGB')
+            else:
+                im = im.convert('RGB')
             result_img = normalize(to_tensor(center_crop(resize(im)))).data.cpu().numpy()
             np.save(os.path.join(save_folder, '{:06d}.npy'.format(basename)), result_img)
         file_list.clear()
