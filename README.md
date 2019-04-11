@@ -17,6 +17,9 @@ set of rows that contains r_pid, r_uid, r_t, p_pid, p_uid, p_t, c_pid, c_uid, c_
 - Specific model name: bert-base-multilingual-cased
 - dim for each vector: 768
 
+## Files
+- brain4/datasets/Twitter/final/image
+- brain4/datasets/Twitter/final/text
 
 ## TODO:
 - Jungwhan: for each r_pid, p_pid, c_pid, have an extra column with a unique_id uid. uid should be within [0,V-1], where V is the total number of unique ids.
@@ -26,3 +29,4 @@ set of rows that contains r_pid, r_uid, r_t, p_pid, p_uid, p_t, c_pid, c_uid, c_
   - wiener index for tree starting at (r_pid, p_pid, c_id)?
 - Wilka: use negative sampling to use another random batch
   - 2: better way to shuffle. Yunseok is recommending I change the format of the CSV to a HD5. Use h5py
+  - 3. log tensorbard

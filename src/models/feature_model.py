@@ -11,35 +11,35 @@ def shuffle_batch(t):
 
 class UserEmbedder(nn.Module):
   """docstring for UserEmbedder"""
-  def __init__(self, vocab_size, embedding_size=256, hidden_size=256):
+  def __init__(self, vocab_size, embedding_size=256, content_embed_size=256):
     super(UserEmbedder, self).__init__()
     self.vocab_size = vocab_size
     self.embedder = nn.Embedding(self.vocab_size, embedding_size)  # 2 words in vocab, 5 dimensional embeddings
     self.nn = nn.Sequential(
-      nn.Linear(embedding_size, hidden_size), nn.ReLU(),
+      nn.Linear(embedding_size+content_embed_size, 256), nn.ReLU(),
+      nn.Linear(256, 256), nn.ReLU(),
+      nn.Linear(256, 256), nn.ReLU(),
+      nn.Linear(256, 256), nn.ReLU()
     )
 
-  def forward(self, user_id):
-    return self.nn(self.embedder(user_id))
+  def forward(self, user_id, content_embed):
+    return self.embedder(user_id)
 
-class BasicModel(nn.Module):
-  """docstring for BasicModel"""
-  def __init__(self, vocab_size, embedding_size=256, hidden_size=256):
-    super(BasicModel, self).__init__()
+class FeatureModel(nn.Module):
+  """docstring for FeatureModel"""
+  def __init__(self, vocab_size, embedding_size=256, content_embed_size=256):
+    super(FeatureModel, self).__init__()
     self.vocab_size = vocab_size
-    self.embedder = UserEmbedder(vocab_size, embedding_size, hidden_size)
+    self.embedder = UserEmbedder(vocab_size, embedding_size, content_embed_size)
     self.p_followed_net = nn.Sequential(
-      nn.Linear(2*embedding_size, 256), nn.ReLU(),
-      nn.Linear(256, 1), nn.Sigmoid()
+      nn.Linear(512, 1), nn.Sigmoid()
     )
 
     self.target_net = nn.Sequential(
-      nn.Linear(embedding_size, 256), nn.ReLU(),
       nn.Linear(256, 1)
     )
 
     self.value_net = nn.Sequential(
-      nn.Linear(embedding_size, 256), nn.ReLU(),
       nn.Linear(256, 1)
     )
 
@@ -57,15 +57,16 @@ class BasicModel(nn.Module):
 
     return torch.cat(p_followed_false)
 
-  def forward(self, rid, pid, cid, rid_other, pid_other, cid_other):
-    # embedding of users
-    p_embed = self.embedder(pid)
-    c_embed = self.embedder(cid)
-    r_embed = self.embedder(cid)
+  def forward(self, rid, pid, cid, rid_other, pid_other, cid_other, content_embed):
 
-    r_other_embed = self.embedder(rid_other)
-    p_other_embed = self.embedder(pid_other)
-    c_other_embed = self.embedder(cid_other)
+    # embedding of users
+    p_embed = self.embedder(pid, content_embed)
+    c_embed = self.embedder(cid, content_embed)
+    r_embed = self.embedder(cid, content_embed)
+
+    r_other_embed = self.embedder(rid_other, content_embed)
+    p_other_embed = self.embedder(pid_other, content_embed)
+    c_other_embed = self.embedder(cid_other, content_embed)
 
 
     # MACROSCOPIC INFO: for depth recursion
@@ -99,7 +100,9 @@ if __name__ == '__main__':
   import argparse
 
   parser = argparse.ArgumentParser()
-  parser.add_argument('-f', '--filename', type=str)
+  parser.add_argument('-mf', '--master-filename', type=str)
+  parser.add_argument('-if', '--image-filename', type=str)
+  parser.add_argument('-tf', '--text-filename', type=str)
   parser.add_argument('-bs', '--batch-size', type=int, default=128)
   parser.add_argument('-fl', '--file-length', type=int, default=0)
   parser.add_argument('-e', '--epochs', type=int, default=1000)
@@ -115,7 +118,7 @@ if __name__ == '__main__':
   unique_ids = dataloader.unique_ids()
   id2indx = {uid:indx for indx, uid in enumerate(unique_ids)}
 
-  model = BasicModel(vocab_size=len(unique_ids))
+  model = FeatureModel(vocab_size=len(unique_ids))
   optimizer = optim.Adam(model.parameters(), lr=args['learning_rate'])
 
   for epoch in tqdm(args['epochs']):
