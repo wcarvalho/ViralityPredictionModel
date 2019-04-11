@@ -34,7 +34,7 @@ def main(argv):
         if len(batch_list) == 0:
             continue
         hf = h5py.File(os.path.join(write_dir, '{}_{}.h5'.format(batch_list[0][0], batch_list[-1][0])), 'w')
-        for pid, vlaue in batch_list:
+        for pid, value in batch_list:
             grp = hf.create_group(str(pid))
             grp.create_dataset('text', data=value)
         hf.flush()

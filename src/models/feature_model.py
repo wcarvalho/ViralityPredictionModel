@@ -121,14 +121,14 @@ if __name__ == '__main__':
   model = FeatureModel(vocab_size=len(unique_ids))
   optimizer = optim.Adam(model.parameters(), lr=args['learning_rate'])
 
-  for epoch in tqdm(args['epochs']):
-    for data in dataloader:
+  # for epoch in tqdm(args['epochs']):
+  #   for data in dataloader:
 
-      r_pid = torch.tensor([id2indx[d] for d in data['r_pid']], dtype=torch.long)
-      p_pid = torch.tensor([id2indx[d] for d in data['p_pid']], dtype=torch.long)
-      c_pid = torch.tensor([id2indx[d] for d in data['c_pid']], dtype=torch.long)
+  #     r_pid = torch.tensor([id2indx[d] for d in data['r_pid']], dtype=torch.long)
+  #     p_pid = torch.tensor([id2indx[d] for d in data['p_pid']], dtype=torch.long)
+  #     c_pid = torch.tensor([id2indx[d] for d in data['c_pid']], dtype=torch.long)
 
-      p_value, c_value, r_value, target, p_followed_true, p_followed_false = model(r_pid, p_pid, c_pid, r_pid, p_pid, c_pid)
+  #     p_value, c_value, r_value, target, p_followed_true, p_followed_false = model(r_pid, p_pid, c_pid, r_pid, p_pid, c_pid)
 
-      neg_sampling_followed_loss = negative_sampling_loss(p_followed_true.squeeze(), p_followed_false.squeeze())
-      break
+  #     neg_sampling_followed_loss = negative_sampling_loss(p_followed_true.squeeze(), p_followed_false.squeeze())
+  #     break

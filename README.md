@@ -7,7 +7,7 @@ set of rows that contains r_pid, r_uid, r_t, p_pid, p_uid, p_t, c_pid, c_uid, c_
 
 ### 2. Image array
 
-(key,value dictionary, created with hdf5 format):  key=r_pid, value={"vis": image or video_vector, "label": image/video}
+(key,value dictionary, created with hdf5 format):  key=r_pid, value={"img(or vid)": image or video_vector}
 
 ### 3. Text array
 
@@ -29,4 +29,3 @@ set of rows that contains r_pid, r_uid, r_t, p_pid, p_uid, p_t, c_pid, c_uid, c_
   - wiener index for tree starting at (r_pid, p_pid, c_id)?
 - Wilka: use negative sampling to use another random batch
   - 2: better way to shuffle. Yunseok is recommending I change the format of the CSV to a HD5. Use h5py
-  - 3. log tensorbard
