@@ -22,11 +22,6 @@ BATCH_SIZE = 512
 TARGET_PATH = '/home/yunseokj/mining_proj/github/dataset/'
 
 def main(argv):
-    resize = transforms.Resize(256)
-    center_crop = transforms.CenterCrop(224)
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
-    to_tensor = transforms.ToTensor()
     resnet152 = models.resnet152(pretrained=True)
     modules = list(resnet152.children())[:-1]
     resnet152 = nn.Sequential(*modules)
@@ -58,19 +53,10 @@ def main(argv):
             tensor_list = []
             key_list = []
             for key, single_path in batch_list:
-                try:
-                    im = Image.open(single_path)
-                    if im is None:
-                        continue
-                except IOError:
-                    continue
-                except Exception:
-                    continue
-                im = im.convert('RGB')
-                result_img = Variable(normalize(to_tensor(center_crop(resize(im)))).unsqueeze(0))
+                npy_file = np.load(single_path)
+                result_img = Variable(torch.from_numpy(npy_file).unsqueeze(0))
                 key_list.append(key)
                 tensor_list.append(result_img)
-
             tensor_list = torch.cat(tensor_list, 0)
             tensor_list = tensor_list.to('cuda')
 
