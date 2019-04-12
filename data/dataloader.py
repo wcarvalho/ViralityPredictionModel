@@ -63,8 +63,6 @@ class TwitterDataloader(object):
 
 
 
-
-
 if __name__ == '__main__':
   
   from src.config import load_parser
@@ -87,10 +85,11 @@ if __name__ == '__main__':
 
   dataloader = TwitterDataloader(chunks=args['master_filenames'],
     colnames=colnames,
+    key=args['key'],
     label_files=label_files,
     label_map=label_map,
     text_files=text_files,
-    image_files=image_files 
+    image_files=image_files, 
     shuffle=False, batch_size=args['batch_size'], num_workers=4)
 
   for batch in dataloader: pass

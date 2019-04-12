@@ -11,6 +11,7 @@ def load_parser():
   parser.add_argument('-bs', '--batch-size', type=int, default=1024)
   parser.add_argument('-k', '--key', type=str, default="root_postID")
   parser.add_argument('-e', '--epochs', type=int, default=1000)
+  parser.add_argument('-s', '--vocab-size', type=int, default=13649798)
   # parser.add_argument('-fl', '--file-length', type=int, default=0)
   # parser.add_argument('-s', '--shuffle', type=int, default=1, choices=[0,1])
   parser.add_argument('-lr', '--learning-rate', type=float, default=1e-3)

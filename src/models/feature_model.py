@@ -1,4 +1,5 @@
-from src.dataloader import TwitterDataloader
+import yaml
+from data.dataloader import TwitterDataloader
 import tqdm
 import torch
 from torch import nn
@@ -87,19 +88,19 @@ class Model(object):
 
     p_followed_false = []
     p_followed_false.append(
-      `self.FollowingPredictor(torch.prod([
+      self.FollowingPredictor(torch.prod([
         p_embed,
         self.FollowerUserEmbedder(pid_other),
         content_embed
       ])))
     p_followed_false.append(
-      `self.FollowingPredictor(torch.prod([
+      self.FollowingPredictor(torch.prod([
         c_embed,
         self.FollowerUserEmbedder(cid_other),
         content_embed
       ])))
     p_followed_false.append(
-      `self.FollowingPredictor(torch.prod([
+      self.FollowingPredictor(torch.prod([
         r_embed,
         self.FollowerUserEmbedder(rid_other),
         content_embed
@@ -150,9 +151,29 @@ if __name__ == '__main__':
   parser = load_parser()
   args, unknown = parser.parse_known_args()
   args = vars(args)
-  pprint(args)
 
-  dataloader = TwitterDataloader(args['master_filename'], args['label_filename'], args['image_filename'], args['text_filename'], args['colnames'], args['file_length'], args['batch_size'])
+  colnames = args['colnames']
+  if args['header']:
+    with open(args['header']) as f:
+      colnames = f.readlines()[0].strip().split(",")
 
-  unique_ids = dataloader.unique_ids()
-  model = FeatureModel(vocab_size=len(unique_ids))
+  label_files = args['label_filenames']
+  text_files = args['text_filenames']
+  image_files = args['image_filenames']
+
+  if not args['label_map']: raise RuntimeError("need map to find label files")
+  with open(args['label_map'], 'r') as f:
+    label_map = yaml.load(f)
+
+  dataloader = TwitterDataloader(chunks=args['master_filenames'],
+    colnames=colnames,
+    key=args['key'],
+    label_files=label_files,
+    label_map=label_map,
+    text_files=text_files,
+    image_files=image_files,
+    shuffle=False, batch_size=args['batch_size'], num_workers=4)
+
+  # model = FeatureModel(vocab_size=args['vocab_size'])
+  for r_uid, p_ui, c_uid, rc_length, text_data, image_data, tree_size, max_depth, avg_depth in dataloader:
+    import ipdb; ipdb.set_trace()

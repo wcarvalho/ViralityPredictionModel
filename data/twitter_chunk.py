@@ -11,7 +11,6 @@ import h5py
 
 from src.utils import get_filenames
 
-
 def binary_search(files, split_func, pid):
   if not len(files): return None
 
@@ -73,9 +72,9 @@ class TwitterDatasetChunk(Dataset):
     master_data = self.df.iloc[idx]
     p_id = master_data[self.key]
 
-    tree_size = None
-    max_depth = None
-    avg_depth = None
+    tree_size = []
+    max_depth = []
+    avg_depth = []
     # load labels
     if self.label_files:
       label_file = binary_search(self.label_files, lambda x: self.label_map[x], p_id)
@@ -94,15 +93,12 @@ class TwitterDatasetChunk(Dataset):
 
       if len(tree_size) > 1: raise RuntimeError("why do you get multiple values for a single root_postID")
 
-
-
-
-    text_data = None
+    text_data = []
     if self.text_files:
       text_data = load_h5py_data(self.text_files, p_id, "text")
       text_data = torch.from_numpy(text_data).float()
 
-    image_data = None
+    image_data = []
     if self.image_files:
       image_data = load_h5py_data(self.image_files, p_id, "image")
       image_data = torch.from_numpy(image_data).float()
@@ -140,6 +136,7 @@ if __name__ == '__main__':
   if not args['label_map']: raise RuntimeError("need map to find label files")
   with open(args['label_map'], 'r') as f:
     label_map = yaml.load(f)
+
   dataset = TwitterDatasetChunk(filename=args['master_filenames'][0],
     colnames=colnames,
     key=args['key'],
