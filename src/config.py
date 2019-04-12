@@ -12,5 +12,6 @@ def load_parser():
   parser.add_argument('-e', '--epochs', type=int, default=1000)
   # parser.add_argument('-s', '--shuffle', type=int, default=1, choices=[0,1])
   parser.add_argument('-lr', '--learning-rate', type=float, default=1e-3)
+  parser.add_argument('-he', '--header', type=str, default=None)
   parser.add_argument('-cn', '--colnames', type=str, default=["r_pid", "r_uid", "r_t", "p_pid", "p_uid", "p_t", "c_pid", "c_uid", "c_t", "text", "data"], nargs='+')
   return parser
