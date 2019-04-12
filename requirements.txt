@@ -2,3 +2,5 @@ h5py
 torch
 torchvision
 tqdm
+ipdb
+pyyaml

@@ -9,7 +9,6 @@ import operator
 if __name__ == '__main__':
   from src.config import load_parser
   parser = load_parser()
-  parser.add_argument('-k', '--key', type=str, default="root_postID")
   parser.add_argument('-bb', '--bucket-base', type=int, default=50000)
   parser.add_argument('-o', '--outdir', type=str, default="data/data/")
   args, unknown = parser.parse_known_args()
@@ -27,7 +26,7 @@ if __name__ == '__main__':
   path_exists(args['outdir'])
 
   print("reading csv")
-  df = pd.read_csv(args['master_filename'], sep=",", names=colnames, header=None)
+  df = pd.read_csv(args['master_filenames'][0], sep=",", names=colnames, header=None)
 
   dfs = dict(tuple(df.groupby(args['key'])))
   print("sorting csv")
@@ -46,4 +45,3 @@ if __name__ == '__main__':
           if colname == args['key']: continue
           grp.create_dataset(colname, data=df[colname].values)
     hf.flush()
-
