@@ -7,19 +7,20 @@ set of rows that contains r_pid, r_uid, r_t, p_pid, p_uid, p_t, c_pid, c_uid, c_
 
 ### 2. Image array
 
-(key,value dictionary, created with hdf5 format):  key=r_pid, value={"img(or vid)": image or video_vector}
+(key,value dictionary, created with hdf5 format):  key=r_pid, value={"img(or vid)": image or video_vector}, #512/1024, pass through few layers of NN
 
 ### 3. Text array
 
-(key,value dictionary, created with hdf5 format):    key=r_pid, value={"text": text_vector}
+(key,value dictionary, created with hdf5 format):    key=r_pid, value={"text": text_vector} #768, pass through few layers of NN
 
 - Extracted from BERT
 - Specific model name: bert-base-multilingual-cased
 - dim for each vector: 768
 
 ## Files
-- brain4/datasets/Twitter/final/image
-- brain4/datasets/Twitter/final/text
+- /mnt/brain4/datasets/Twitter/final/image
+- /mnt/brain4/datasets/Twitter/final/text
+- /mnt/brain4/datasets/Twitter/junghwan
 
 ## TODO:
 - Jungwhan: for each r_pid, p_pid, c_pid, have an extra column with a unique_id uid. uid should be within [0,V-1], where V is the total number of unique ids.
