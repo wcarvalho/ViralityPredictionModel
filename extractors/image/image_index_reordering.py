@@ -16,7 +16,7 @@ RESCALED_PATH = '/data/yunseokj/mining/image_rescale'
 
 def main(argv):
     #if len(argv) != 2:
-    #    print('wrong python image_index_reordering new_bucket_no')
+    #    print('wrong python image_index_reordering.py new_bucket_no')
 
     #target_validator_id = int(argv[1])
 

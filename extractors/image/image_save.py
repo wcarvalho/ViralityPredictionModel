@@ -9,7 +9,6 @@ import numpy as np
 import pickle
 from tqdm import trange, tqdm
 from PIL import Image
-BUCKET_PATH = '/home/yunseokj/mining_proj/github/dataset/image_bucket'
 
 import torch.nn as nn
 import torchvision.models as models
@@ -18,10 +17,24 @@ from torch.autograd import Variable
 import h5py
 
 BATCH_SIZE = 512
+BUCKET_SIZE = 512 * 100
 #TARGET_PATH ='/mnt/brain4/datasets/Twitter/final/image'
-TARGET_PATH = '/home/yunseokj/mining_proj/github/dataset/'
+TARGET_PATH = '/data/yunseokj/mining/image_feature_output'
+SPLIT_SIZE = 677500
+SORTED_PATH = '/data/yunseokj/mining/image_sorted'
 
 def main(argv):
+    if len(argv) != 2:
+        print('wrong python image_index_reordering new_bucket_no')
+    bucket_no = int(argv[1])
+    bucket_folder = os.path.join(SORTED_PATH, '{}_{}'.format(SPLIT_SIZE * bucket_no, SPLIT_SIZE * (bucket_no + 1)))
+
+    with open('/data/yunseokj/mining/orig_image{}.pickle'.format(bucket_no), 'rb') as f:
+        file_list = pickle.load(f)
+
+    if not os.path.exists(TARGET_PATH):
+        os.makedirs(TARGET_PATH)
+
     resnet152 = models.resnet152(pretrained=True)
     modules = list(resnet152.children())[:-1]
     resnet152 = nn.Sequential(*modules)
@@ -30,49 +43,56 @@ def main(argv):
     for p in resnet152.parameters():
         p.requires_grad = False
 
-    bucket_path_list = glob.glob(BUCKET_PATH +'/*.pickle')
-    bucket_path_len = len(bucket_path_list)
-    bucket_path_list.clear()
 
-    TO_BUCKET = bucket_path_len
-    if len(argv) >= 2:
-        FROM_BUCKET = int(argv[1])
-        if len(argv) >= 3:
-            TO_BUCKET = min(TO_BUCKET, int(argv[2]))
-    else:
-        FROM_BUCKET = 0
+    def run_inference(values):
+        tensor_list = torch.cat(values, 0)
+        tensor_list = tensor_list.to('cuda')
 
-    for idx in range(FROM_BUCKET, TO_BUCKET):
-        # save output by bucket
-        with open(os.path.join(BUCKET_PATH, '{:06d}.pickle'.format(idx)), 'rb') as f:
-            bucket_list = pickle.load(f)
+        # remove gradient once again for a sanity check
+        resnet152.zero_grad()
+        # Predict the fc layer value
+        with torch.no_grad():
+            output = resnet152.forward(tensor_list)
+        output_list = output.data.cpu().numpy()
+        return output_list
 
-        hf = h5py.File(os.path.join(TARGET_PATH, '{}_{}.h5'.format(bucket_list[0][0], bucket_list[-1][0])), 'w')
-        for batch_idx in trange((len(bucket_list) + BATCH_SIZE - 1) // BATCH_SIZE, ncols=70):
-            batch_list = bucket_list[batch_idx * BATCH_SIZE:(batch_idx+1)*BATCH_SIZE]
-            tensor_list = []
-            key_list = []
-            for key, single_path in batch_list:
-                npy_file = np.load(single_path)
-                result_img = Variable(torch.from_numpy(npy_file).unsqueeze(0))
-                key_list.append(key)
-                tensor_list.append(result_img)
-            tensor_list = torch.cat(tensor_list, 0)
-            tensor_list = tensor_list.to('cuda')
+    def save_result(keys, results):
+        hf = h5py.File(os.path.join(TARGET_PATH, '{}_{}.h5'.format(keys[0], keys[-1])), 'w')
+        for pid, value in zip(keys, results):
+            grp = hf.create_group(str(pid))
+            grp.create_dataset('img', data=value)
+        hf.flush()
 
-            # remove gradient once again for a sanity check
-            resnet152.zero_grad()
-            # Predict the fc layer value
-            with torch.no_grad():
-                output = resnet152.forward(tensor_list)
-            output_list = output.data.cpu().numpy()
+    key_list = []
+    tensor_list = []
+    value_list = []
+    for single_file_info in tqdm(file_list, ncols=70):
+        target_path = os.path.join(bucket_folder, '{}.npy'.format(single_file_info[0]))
+        npy_file = np.load(target_path)
+        result_img = Variable(torch.from_numpy(npy_file).unsqueeze(0))
 
-            for pid, value in zip(key_list, output_list):
-                grp = hf.create_group(str(pid))
-                grp.create_dataset('img', data=value)
-            hf.flush()
+        key_list.append(single_file_info[0])
+        tensor_list.append(result_img)
+
+        if len(tensor_list) == BATCH_SIZE:
+            temp_output_list = run_inference(tensor_list)
+            tensor_list.clear()
+            value_list.extend(temp_output_list)
+
+        if len(key_list) == BUCKET_SIZE:
+            save_result(key_list, value_list)
             key_list.clear()
-        bucket_list.clear()
+            value_list.clear()
+
+    if len(tensor_list) != 0:
+        temp_output_list = run_inference(tensor_list)
+        tensor_list.clear()
+        value_list.extend(temp_output_list)
+
+    if len(key_list) != 0:
+        save_result(key_list, value_list)
+        key_list.clear()
+        value_list.clear()
 
 if __name__ == "__main__":
     main(sys.argv)

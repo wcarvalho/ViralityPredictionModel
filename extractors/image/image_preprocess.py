@@ -16,7 +16,7 @@ import torchvision.transforms as transforms
 
 def main(argv):
     if len(argv) != 2:
-        print('wrong python image_index_reordering new_bucket_no')
+        print('wrong python image_preprocess.py new_bucket_no')
     bucket_no = int(argv[1])
 
     with open('/data/yunseokj/mining/orig_image{}.pickle'.format(bucket_no), 'rb') as f:
