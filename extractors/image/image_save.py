@@ -53,6 +53,8 @@ def main(argv):
         # Predict the fc layer value
         with torch.no_grad():
             output = resnet152.forward(tensor_list)
+            # remove other dimensions
+            output = torch.squeeze(torch.squeeze(output, 1), 1)
         output_list = output.data.cpu().numpy()
         return output_list
 
