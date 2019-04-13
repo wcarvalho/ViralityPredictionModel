@@ -14,18 +14,41 @@ from data.dataloader import TwitterDataloader
 from src.models.feature_model import FeatureModel
 from src.utils import path_exists, filepath_exists, AverageMeter
 
-def negative_sampling_losses(positive, negative):
+EPS = 1e-12
 
-  positive_loss = F.binary_cross_entropy_with_logits(positive, torch.ones_like(positive), reduction='sum')
-  negative_loss = F.binary_cross_entropy_with_logits(negative, torch.zeros_like(negative), reduction='sum')
+def negative_sampling_loss(positive, negative):
 
-  return positive_loss, negative_loss
+  # convert negative to batch_size x num_negative
+  negative = torch.stack(negative).permute(1,0,2).squeeze(2) 
+
+  # concatenate both negative and positive alone second dimension
+  pred = torch.cat([positive, negative], dim=-1)
+  
+  # now create labels of positive and negative along respective columns
+  true = torch.cat([torch.ones_like(positive), torch.zeros_like(negative)], dim=-1)
+
+  # don't normalize yet
+  loss = F.binary_cross_entropy_with_logits(pred, true, reduction='none')
+
+  # sum over columns and do mean over batch
+  loss = loss.sum(dim=-1).mean()
+
+  return loss
 
 def depth_loss(r_value, p_value, c_value, rc_length):
   """Expected depth consistency loss"""
-  rc_loss = F.mse_loss(r_value, rc_length + c_value) # r_value = l + c_value
-  rp_loss = F.mse_loss(r_value, (rc_length - 1) + p_value) # r_value = l - 1 + c_value
-  pc_loss = F.mse_loss(p_value, 1 + c_value) # p_value = 1 + c_value
+  if (rc_length<1.0).any():
+    error = "Why is any length between root and child below zero?"
+    import ipdb; ipdb.set_trace()
+    raise (error)
+
+  r_log = (r_value+EPS).log()
+  p_log = (p_value+EPS).log()
+  c_log = (c_value+EPS).log()
+
+  rc_loss = F.mse_loss(r_log, (rc_length + c_value).log())  # log(r_value) = log(l + c_value)
+  rp_loss = F.mse_loss(r_log, (rc_length - 1 + p_value + EPS).log())  # r_value = l - 1 + c_value
+  pc_loss = F.mse_loss(p_log, c_log)                    # p_value = 1 + c_value
 
   return rc_loss, rp_loss, pc_loss
 
@@ -62,7 +85,7 @@ class Trainer(object):
     else:
       self.writer = None
 
-    self.meters = {meter: AverageMeter() for meter in ['positive_loss', 'negative_loss', 'rc_loss', 'rp_loss', 'pc_loss', 'target_loss']}
+    self.meters = {meter: AverageMeter() for meter in ['negative_sampling_loss', 'rc_loss', 'rp_loss', 'pc_loss', 'target_loss']}
 
   def train(self, dataloader):
     
@@ -93,8 +116,7 @@ class Trainer(object):
       p_followed_true, p_followed_false, p_value, c_value, r_value, pred_target = model(r_vector, p_vector, c_vector, r_vector_other, p_vector_other, c_vector_other, image_data, text_data)
 
       # ---- Compute Losses ---
-      positive_loss, negative_loss = negative_sampling_losses(p_followed_true, p_followed_false)
-      p_follow_loss = positive_loss + negative_loss
+      p_follow_loss = negative_sampling_loss(p_followed_true, p_followed_false)
       rc_loss, rp_loss, pc_loss = depth_loss(r_value, p_value, c_value, rc_length.float().to(self.device))
       recursive_loss = rc_loss + rp_loss + pc_loss
 
@@ -114,8 +136,7 @@ class Trainer(object):
 
       # ---- Record Losses ---
       batch_len = r_vector.shape[0]
-      self.meters['positive_loss'].update(positive_loss.item(), batch_len)
-      self.meters['negative_loss'].update(negative_loss.item(), batch_len)
+      self.meters['negative_sampling_loss'].update(p_follow_loss.item(), batch_len)
       self.meters['rc_loss'].update(rc_loss.item(), batch_len)
       self.meters['rp_loss'].update(rp_loss.item(), batch_len)
       self.meters['pc_loss'].update(pc_loss.item(), batch_len)
@@ -124,7 +145,7 @@ class Trainer(object):
       # ----- Set pbar/tqdm description --- 
       pbar.set_description("target: %.2f, follow: %.2f, recur: %.2f" % (
         self.meters['target_loss'].average,
-        self.meters['positive_loss'].average+self.meters['negative_loss'].average,
+        self.meters['negative_sampling_loss'].average,
         self.meters['rc_loss'].average + self.meters['rp_loss'].average + self.meters['pc_loss'].average
         ))
       batch_1 = batch_2
@@ -180,7 +201,7 @@ if __name__ == '__main__':
     text_embed_size=768,
     hidden_size=256,
     joint_embedding_size=256)
-  if torch.cuda.device_count() > 1:
+  if torch.cuda.device_count() > 1 and args['all_gpu']:
     print("Using %d GPUS!" % torch.cuda.device_count())
     model = nn.DataParallel(model)
   model = model.to(device)

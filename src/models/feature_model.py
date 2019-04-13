@@ -76,9 +76,15 @@ class FeatureModel(nn.Module):
       nn.Linear(joint_embedding_size, 1), nn.Sigmoid()
     )
 
-    self.ViralityPrediction = NeuralNetwork(joint_embedding_size, hidden_size, 1, n_hidden=1)
+    self.ViralityPrediction = nn.Sequential(
+      NeuralNetwork(joint_embedding_size, hidden_size, 1, n_hidden=1),
+      nn.ReLU()
+      )
 
-    self.DepthPrediction = NeuralNetwork(joint_embedding_size, hidden_size, 1, n_hidden=1)
+    self.DepthPrediction = nn.Sequential(
+      NeuralNetwork(joint_embedding_size, hidden_size, 1, n_hidden=1),
+      nn.ReLU()
+      )
 
   def follower_predictions(self, r_embed, p_embed, c_embed, c_vector, r_vector_other, p_vector_other, c_vector_other, image, text):
 
@@ -104,7 +110,10 @@ class FeatureModel(nn.Module):
       torch.mul(r_embed,
         content_embed.mul(self.FollowerUserEmbedder(r_vector_other)),
       )))
-    p_followed_false = torch.stack(p_followed_false)
+
+    # print([p.shape for p in p_followed_false])
+    # p_followed_false = torch.stack(p_followed_false)
+    # print(p_followed_true.shape, p_followed_false.shape)
     return p_followed_true, p_followed_false
 
   def forward(self, r_vector, p_vector, c_vector, r_vector_other, p_vector_other, c_vector_other, image, text):
@@ -127,7 +136,7 @@ class FeatureModel(nn.Module):
     r_value = self.DepthPrediction(torch.mul(
       r_embed, content_embed))
 
-    # TARGET: viralirty
+    # TARGET: viralirty metrics
     target = self.ViralityPrediction(torch.mul(
       r_embed, content_embed))
 
