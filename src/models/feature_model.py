@@ -104,7 +104,7 @@ class FeatureModel(nn.Module):
       torch.mul(r_embed,
         content_embed.mul(self.FollowerUserEmbedder(r_vector_other)),
       )))
-    p_followed_false = torch.cat(p_followed_false)
+    p_followed_false = torch.stack(p_followed_false)
     return p_followed_true, p_followed_false
 
   def forward(self, r_vector, p_vector, c_vector, r_vector_other, p_vector_other, c_vector_other, image, text):

@@ -93,7 +93,7 @@ class TwitterDatasetChunk(Dataset):
       max_depth = torch.from_numpy(max_depth)
       avg_depth = torch.from_numpy(avg_depth)
 
-      if len(tree_size) > 1: raise RuntimeError("why do you get multiple values for a single root_postID")
+      if len(tree_size) > 1: raise RuntimeError("why do you get multiple values for a single root_postID?")
 
     text_data = []
     if self.text_files:

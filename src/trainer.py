@@ -1,36 +1,50 @@
+import os
+
+import numpy as np
 import yaml
-from data.dataloader import TwitterDataloader
-import tqdm
+from tqdm import tqdm
+
 import torch
 from torch import nn
 from torch.nn import functional as F
 import torch.optim as optim
-
 from tensorboardX import SummaryWriter
 
+from data.dataloader import TwitterDataloader
 from src.models.feature_model import FeatureModel
-from src.utils import path_exists
+from src.utils import path_exists, filepath_exists, AverageMeter
 
-def negative_sampling_loss(positive, negative):
+def negative_sampling_losses(positive, negative):
 
-  positive_y = torch.ones(positive.shape[0])
-  negative_y = torch.zeros(negative.shape[0])
+  positive_loss = F.binary_cross_entropy_with_logits(positive, torch.ones_like(positive), reduction='sum')
+  negative_loss = F.binary_cross_entropy_with_logits(negative, torch.zeros_like(negative), reduction='sum')
 
-  positive_loss = F.binary_cross_entropy_with_logits(positive, positive_y)
-  negative_loss = F.binary_cross_entropy_with_logits(negative, negative_y)
+  return positive_loss, negative_loss
 
-  return positive_loss + negative_loss
+def depth_loss(r_value, p_value, c_value, rc_length):
+  """Expected depth consistency loss"""
+  rc_loss = F.mse_loss(r_value, rc_length + c_value) # r_value = l + c_value
+  rp_loss = F.mse_loss(r_value, (rc_length - 1) + p_value) # r_value = l - 1 + c_value
+  pc_loss = F.mse_loss(p_value, 1 + c_value) # p_value = 1 + c_value
 
+  return rc_loss, rp_loss, pc_loss
 
 class Trainer(object):
   """docstring for Trainer"""
-  def __init__(self, model, optimizer, seed=1, log_dir=None, checkpoint=None):
+  def __init__(self, model, optimizer, device, target_name="tree_size", seed=1, micro_lambda=1, macro_lambda=1, max_epoch=10, log_dir=None, checkpoint=None):
     super(Trainer, self).__init__()
     self.model = model
     self.optimizer = optimizer
+    self.device = device
+    self.target_name = target_name
+    self.seed = seed
+    self.micro_lambda = micro_lambda
+    self.macro_lambda = macro_lambda
+    self.max_epoch = max_epoch
     self.log_dir = log_dir
     self.checkpoint = checkpoint
-    self.seed=seed
+
+    self.start_epoch = 0
 
     torch.manual_seed(seed)
     np.random.seed(seed)
@@ -48,30 +62,78 @@ class Trainer(object):
     else:
       self.writer = None
 
+    self.meters = {meter: AverageMeter() for meter in ['positive_loss', 'negative_loss', 'rc_loss', 'rp_loss', 'pc_loss', 'target_loss']}
+
   def train(self, dataloader):
     
-    for epoch in self.epochs:
+    pbar = tqdm(range(self.start_epoch, self.max_epoch))
+    pbar.set_description("Epoch %d" % self.start_epoch)
+    for epoch in pbar:
+      self.model.train()
       self.train_epoch(dataloader)
+      self.meters.reset()
+      pbar.set_description("Epoch %d" % epoch)
 
-  def train_epoch(self):
+  def train_epoch(self, dataloader):
+    
     data_iter = iter(dataloader)
     batch_0 = next(data_iter)
     batch_1 = batch_0
-    for batch_ind in range(len(dataloader)-1):
+
+    pbar = tqdm(range(len(dataloader)-1))
+    pbar.set_description("target: 0, follow: 0, recur: 0")
+    for batch_ind in pbar:
+      # ---- Get data for computing outputs ---
       r_vector, p_vector, c_vector, rc_length, text_data, image_data, tree_size, max_depth, avg_depth = batch_1
 
       batch_2 = next(data_iter)
       r_vector_other, p_vector_other, c_vector_other, _, _, _, _, _, _ = batch_2
 
-      p_followed_true, p_followed_false, p_value, c_value, r_value, target = model(r_vector, p_vector, c_vector, r_vector_other, p_vector_other, c_vector_other, image_data, text_data)
+      # ---- Compute outputs ---
+      p_followed_true, p_followed_false, p_value, c_value, r_value, pred_target = model(r_vector, p_vector, c_vector, r_vector_other, p_vector_other, c_vector_other, image_data, text_data)
 
-      p_follow_loss = negative_sampling_loss(p_followed_true, p_followed_false)
+      # ---- Compute Losses ---
+      positive_loss, negative_loss = negative_sampling_losses(p_followed_true, p_followed_false)
+      p_follow_loss = positive_loss + negative_loss
+      rc_loss, rp_loss, pc_loss = depth_loss(r_value, p_value, c_value, rc_length.float().to(self.device))
+      recursive_loss = rc_loss + rp_loss + pc_loss
+
+      if self.target_name == 'tree_size': target = tree_size
+      elif self.target_name == 'max_depth':target = max_depth
+      elif self.target_name == 'avg_depth':target = avg_depth
+      else:
+        raise RuntimeError("target %s not supported" % self.target_name)
+      target_loss = F.mse_loss(pred_target, target.float().to(self.device))
+
+      total_loss = target_loss + self.micro_lambda*p_follow_loss + self.macro_lambda*recursive_loss
+      import ipdb; ipdb.set_trace()
+      # ---- Backprop ---
+      self.optimizer.zero_grad()
+      total_loss.backward()
+      self.optimizer.step()
+
+      # ---- Record Losses ---
+      batch_len = r_vector.shape[0]
+      self.meters['positive_loss'].update(positive_loss.item(), batch_len)
+      self.meters['negative_loss'].update(negative_loss.item(), batch_len)
+      self.meters['rc_loss'].update(rc_loss.item(), batch_len)
+      self.meters['rp_loss'].update(rp_loss.item(), batch_len)
+      self.meters['pc_loss'].update(pc_loss.item(), batch_len)
+      self.meters['target_loss'].update(target_loss.item(), batch_len)
+
+      # ----- Set pbar/tqdm description --- 
+      pbar.set_description("target: %.2f, follow: %.2f, recur: %.2f" % (
+        self.meters['target_loss'].average,
+        self.meters['positive_loss'].average+self.meters['negative_loss'].average,
+        self.meters['rc_loss'].average + self.meters['rp_loss'].average + self.meters['pc_loss'].average
+        ))
       batch_1 = batch_2
+
 
   def load_from_ckpt(self, checkpoint_file):
     print("loading %s" % checkpoint_file)
     checkpoint = torch.load(checkpoint_file)
-    self.epoch  = checkpoint['epoch']+1
+    self.start_epoch = checkpoint['epoch']+1
     self.iter = checkpoint['iter']
     # self.min_valid = checkpoint['min_valid']
 
@@ -111,17 +173,27 @@ if __name__ == '__main__':
   with open(args['label_map'], 'r') as f:
     label_map = yaml.load(f)
 
+  device = torch.device("cpu" if (args['no_cuda'] or not torch.cuda.is_available()) else "cuda")
 
   model = FeatureModel(user_size=args['user_size'],
     image_embed_size=1024,
     text_embed_size=768,
     hidden_size=256,
     joint_embedding_size=256)
+  if torch.cuda.device_count() > 1:
+    print("Using %d GPUS!" % torch.cuda.device_count())
+    model = nn.DataParallel(model)
+  model = model.to(device)
   optimizer = optim.Adam(model.parameters(), lr=args['learning_rate'])
 
   trainer = Trainer(model=model,
     optimizer=optimizer,
+    device=device,
+    target_name=args['target'],
     seed=args['seed'],
+    micro_lambda=args['micro_lambda'],
+    macro_lambda=args['macro_lambda'],
+    max_epoch=args['epochs'],
     log_dir=args['log_dir'],
     checkpoint=args['checkpoint']
   )

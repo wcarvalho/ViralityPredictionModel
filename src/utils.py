@@ -1,6 +1,31 @@
 import pathlib
 import os
 
+class AverageMeter(object):
+  """
+  Computes and stores the average and
+  current value.
+  """
+  def __init__(self):
+      self.reset()
+
+  def reset(self):
+      self.val = 0.0
+      self.sum = 0.0
+      self.count = 0
+
+  def update(self, val, n=1):
+      self.val = val
+      self.sum += val*n
+      self.count += n
+
+  @property
+  def average(self):
+    if self.count > 0:
+      return float(self.sum) / self.count
+    else:
+      return 0
+
 def get_filenames(files, keep_suffix=False):
   names = [os.path.basename(fname) for fname in files]
   if keep_suffix: return names
