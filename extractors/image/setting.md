@@ -1,4 +1,4 @@
-# BERT-based tokenizer
+# Visual Information Extractor
 
 ## Environment Setup for Image/Video Extractor
 ```
@@ -23,5 +23,7 @@ For downloading video, I use 'youtube-dl' which downloads file to the current fo
 So, for downloading video, I need to create a subfolder to execute it.
 I run the video/image downloader with 16 cores
 
-
+## Steps
+image_filter -> image_downloader -> image_index_reordering -> image_preprocess -> image_save
+             -> video_downloader -> ...
 
