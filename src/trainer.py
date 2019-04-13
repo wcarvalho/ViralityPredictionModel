@@ -87,13 +87,13 @@ class Trainer(object):
 
     self.meters = {meter: AverageMeter() for meter in ['negative_sampling_loss', 'rc_loss', 'rp_loss', 'pc_loss', 'target_loss']}
 
-  def train(self, dataloader):
+  def train(self, train_dataloader, valid_dataloader):
     
     pbar = tqdm(range(self.start_epoch, self.max_epoch))
     pbar.set_description("Epoch %d" % self.start_epoch)
     for epoch in pbar:
       self.model.train()
-      self.train_epoch(dataloader)
+      self.train_epoch(train_dataloader)
       self.meters.reset()
       pbar.set_description("Epoch %d" % epoch)
 
@@ -102,45 +102,13 @@ class Trainer(object):
     data_iter = iter(dataloader)
     batch_0 = next(data_iter)
     batch_1 = batch_0
-
+    epoch_loss = 0
     pbar = tqdm(range(len(dataloader)-1))
     pbar.set_description("target: 0, follow: 0, recur: 0")
     for batch_ind in pbar:
-      # ---- Get data for computing outputs ---
-      r_vector, p_vector, c_vector, rc_length, text_data, image_data, tree_size, max_depth, avg_depth = batch_1
-
       batch_2 = next(data_iter)
-      r_vector_other, p_vector_other, c_vector_other, _, _, _, _, _, _ = batch_2
-
-      # ---- Compute outputs ---
-      p_followed_true, p_followed_false, p_value, c_value, r_value, pred_target = model(r_vector, p_vector, c_vector, r_vector_other, p_vector_other, c_vector_other, image_data, text_data)
-
-      # ---- Compute Losses ---
-      p_follow_loss = negative_sampling_loss(p_followed_true, p_followed_false)
-      rc_loss, rp_loss, pc_loss = depth_loss(r_value, p_value, c_value, rc_length.float().to(self.device))
-      recursive_loss = rc_loss + rp_loss + pc_loss
-
-      if self.target_name == 'tree_size': target = tree_size
-      elif self.target_name == 'max_depth':target = max_depth
-      elif self.target_name == 'avg_depth':target = avg_depth
-      else:
-        raise RuntimeError("target %s not supported" % self.target_name)
-      target_loss = F.mse_loss(pred_target, target.float().to(self.device))
-
-      total_loss = target_loss + self.micro_lambda*p_follow_loss + self.macro_lambda*recursive_loss
-      import ipdb; ipdb.set_trace()
-      # ---- Backprop ---
-      self.optimizer.zero_grad()
-      total_loss.backward()
-      self.optimizer.step()
-
-      # ---- Record Losses ---
-      batch_len = r_vector.shape[0]
-      self.meters['negative_sampling_loss'].update(p_follow_loss.item(), batch_len)
-      self.meters['rc_loss'].update(rc_loss.item(), batch_len)
-      self.meters['rp_loss'].update(rp_loss.item(), batch_len)
-      self.meters['pc_loss'].update(pc_loss.item(), batch_len)
-      self.meters['target_loss'].update(target_loss.item(), batch_len)
+      total_loss = self.train_instance(train_batch=batch_1, random_batch=batch_2)
+      epoch_loss += total_loss
 
       # ----- Set pbar/tqdm description --- 
       pbar.set_description("target: %.2f, follow: %.2f, recur: %.2f" % (
@@ -149,6 +117,50 @@ class Trainer(object):
         self.meters['rc_loss'].average + self.meters['rp_loss'].average + self.meters['pc_loss'].average
         ))
       batch_1 = batch_2
+
+    # for last instance, use batch 0 as the "random" batch
+    epoch_loss += self.train_instance(train_batch=batch_2, random_batch=batch_0)
+    return epoch_loss
+
+  def train_instance(self, train_batch, random_batch):
+
+    # ---- Get data for computing outputs ---
+    r_vector, p_vector, c_vector, rc_length, text_data, image_data, tree_size, max_depth, avg_depth = train_batch
+    r_vector_other, p_vector_other, c_vector_other, _, _, _, _, _, _ = random_batch
+
+    # ---- Compute outputs ---
+    p_followed_true, p_followed_false, p_value, c_value, r_value, pred_target = self.model(r_vector, p_vector, c_vector, r_vector_other, p_vector_other, c_vector_other, image_data, text_data)
+
+    # ---- Compute Losses ---
+    p_follow_loss = negative_sampling_loss(p_followed_true, p_followed_false)
+    rc_loss, rp_loss, pc_loss = depth_loss(r_value, p_value, c_value, rc_length.float().to(self.device))
+    recursive_loss = rc_loss + rp_loss + pc_loss
+
+    if self.target_name == 'tree_size': target = tree_size
+    elif self.target_name == 'max_depth':target = max_depth
+    elif self.target_name == 'avg_depth':target = avg_depth
+    else:
+      raise RuntimeError("target %s not supported" % self.target_name)
+    target = (target.float().to(self.device) + EPS).log()
+    target_loss = F.mse_loss(pred_target, target)
+
+    total_loss = target_loss + self.micro_lambda*p_follow_loss + self.macro_lambda*recursive_loss
+    import ipdb; ipdb.set_trace()
+    # ---- Backprop ---
+    self.optimizer.zero_grad()
+    total_loss.backward()
+    self.optimizer.step()
+
+    # ---- Record Losses ---
+    batch_len = r_vector.shape[0]
+    self.meters['negative_sampling_loss'].update(p_follow_loss.item(), batch_len)
+    self.meters['rc_loss'].update(rc_loss.item(), batch_len)
+    self.meters['rp_loss'].update(rp_loss.item(), batch_len)
+    self.meters['pc_loss'].update(pc_loss.item(), batch_len)
+    self.meters['target_loss'].update(target_loss.item(), batch_len)
+    self.meters['total_loss'].update(total_loss.item(), batch_len)
+
+    return total_loss
 
 
   def load_from_ckpt(self, checkpoint_file):
@@ -174,13 +186,14 @@ class Trainer(object):
       }, checkpoint_file)
     print("Saving %s" % checkpoint_file)
 
-if __name__ == '__main__':
 
+def main():
   from pprint import pprint
   from src.config import load_parser
   parser = load_parser()
   args, unknown = parser.parse_known_args()
   args = vars(args)
+  pprint(args)
 
   if args['header']:
     with open(args['header']) as f:
@@ -190,20 +203,29 @@ if __name__ == '__main__':
   text_files = args['text_filenames']
   image_files = args['image_filenames']
 
-  if not args['label_map']: raise RuntimeError("need map to find label files")
+  if not args['label_map']: raise RuntimeError("need label map to find label files for corresponding master csv data")
   with open(args['label_map'], 'r') as f:
     label_map = yaml.load(f)
+
+  if not args['split_map']: raise RuntimeError("need map to split files into train/valid/test")
+  with open(args['split_map'], 'r') as f:
+    split_map = yaml.load(f)
+
+  split_map = {name: set(split_map[name]) for name in split_map}
+  train_files = [f for f in args['master_filenames'] if f in split_map['train']]
+  valid_files = [f for f in args['master_filenames'] if f in split_map['valid']]
 
   device = torch.device("cpu" if (args['no_cuda'] or not torch.cuda.is_available()) else "cuda")
 
   model = FeatureModel(user_size=args['user_size'],
-    image_embed_size=1024,
-    text_embed_size=768,
+    image_embed_size=args['image_size'],
+    text_embed_size=args['text_size'],
     hidden_size=256,
     joint_embedding_size=256)
   if torch.cuda.device_count() > 1 and args['all_gpu']:
     print("Using %d GPUS!" % torch.cuda.device_count())
     model = nn.DataParallel(model)
+
   model = model.to(device)
   optimizer = optim.Adam(model.parameters(), lr=args['learning_rate'])
 
@@ -219,7 +241,7 @@ if __name__ == '__main__':
     checkpoint=args['checkpoint']
   )
 
-  dataloader = TwitterDataloader(chunks=args['master_filenames'],
+  train_dataloader = TwitterDataloader(chunks=train_files,
     colnames=colnames,
     key=args['key'],
     label_files=label_files,
@@ -227,7 +249,24 @@ if __name__ == '__main__':
     text_files=text_files,
     image_files=image_files,
     dummy_user_vector=args['dummy_user_vector'],
-    shuffle=False, batch_size=args['batch_size'], num_workers=4)
+    shuffle=args['shuffle'],
+    batch_size=args['batch_size'], 
+    num_workers=args['num_workers'])
 
-  trainer.train(dataloader)
+  valid_dataloader = TwitterDataloader(chunks=valid_files,
+    colnames=colnames,
+    key=args['key'],
+    label_files=label_files,
+    label_map=label_map,
+    text_files=text_files,
+    image_files=image_files,
+    dummy_user_vector=args['dummy_user_vector'],
+    shuffle=False, 
+    batch_size=args['batch_size'], 
+    num_workers=args['num_workers'])
 
+  trainer.train(train_dataloader, valid_dataloader)
+
+
+if __name__ == '__main__':
+  main()

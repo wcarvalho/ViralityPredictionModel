@@ -2,12 +2,9 @@ import argparse
 import time
 from pprint import pprint
 import os
-import pandas as pd
-from tqdm import trange, tqdm
-from src.utils import path_exists
-import h5py
-import operator
-import dateutil.parser
+import yaml
+
+from src.utils import filepath_exists
 
 
 if __name__ == '__main__':
@@ -17,8 +14,6 @@ if __name__ == '__main__':
   parser.add_argument('-o', '--outfile', type=str, default="data/max_month.txt")
   args, unknown = parser.parse_known_args()
   args = vars(args)
-
-  pprint(args)
 
   filepath_exists(args['outfile'])
 
@@ -40,4 +35,4 @@ if __name__ == '__main__':
   }
 
   with open(args['outfile'], 'w') as f:
-    yaml.dump(ends, f, default_flow_style=False)
+    yaml.dump(split, f, default_flow_style=False)

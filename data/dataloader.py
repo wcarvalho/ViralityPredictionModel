@@ -31,6 +31,7 @@ class TwitterDataloader(object):
     self.num_workers = num_workers
 
     self.chunk_indx = 0
+    self.chunk_batch_indx = 0
     self.num_chunks = len(self.chunks)
 
     self.iterator = self.load_iterator(self.chunks[self.chunk_indx])
@@ -45,23 +46,26 @@ class TwitterDataloader(object):
     return self.num_chunks
 
   def __iter__(self):
-    if self.shuffle: shuffle(self.chunks)
+    if self.shuffle: 
+      shuffle(self.chunks)
     self.chunk_indx = 0
     return self
 
   def __next__(self):
-    try:
+    if self.chunk_batch_indx < len(self.twitter_dataset):
+      self.chunk_batch_indx += 1
       return next(self.iterator)
-    except StopIteration as si:
+    else:
       self.chunk_indx += 1
       if self.chunk_indx >= self.num_chunks:
         raise StopIteration
       else:
         self.iterator = self.load_iterator(self.chunks[self.chunk_indx])
+        self.chunk_batch_indx = 0
         return next(self.iterator)
 
-    except Exception as e:
-      raise e
+    # except Exception as e:
+    #   raise e
 
 
 
