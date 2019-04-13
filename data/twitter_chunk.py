@@ -49,7 +49,7 @@ def load_h5py_data(files, pid, data_type="text"):
 
 class TwitterDatasetChunk(Dataset):
   """docstring for TwitterDatasetChunk"""
-  def __init__(self, filename, key, colnames, label_files, label_map, text_files, image_files):
+  def __init__(self, filename, key, colnames, label_files, label_map, text_files, image_files, dummy_user_vector=False):
     super(TwitterDatasetChunk, self).__init__()
 
     self.filename = filename
@@ -59,6 +59,7 @@ class TwitterDatasetChunk(Dataset):
     self.text_files = text_files
     self.image_files = image_files
     self.key = key
+    self.dummy_user_vector = dummy_user_vector
 
     self.df = pd.read_csv(filename, sep=",", names=colnames, header=None)
     self.length = len(self.df)
@@ -66,6 +67,7 @@ class TwitterDatasetChunk(Dataset):
 
     self.label_df = None
     self.current_label_file = None
+
 
   def __getitem__(self, idx):
 
@@ -103,10 +105,22 @@ class TwitterDatasetChunk(Dataset):
       image_data = load_h5py_data(self.image_files, p_id, "image")
       image_data = torch.from_numpy(image_data).float()
 
+    if self.dummy_user_vector:
+      root_vector = torch.randn([20])
+      previous_vector = torch.randn([20])
+      current_vector = torch.randn([20])
+    else:
+      master_data['root_userID']
+      master_data['previous_userID']
+      master_data['current_userID']
+      raise NotImplementedError
+    
+    # import ipdb; ipdb.set_trace()
+    # root_to_current_path_length = torch.from_numpy(master_data['root_to_current_path_length'])
 
-    return [  master_data['root_userID'],
-              master_data['previous_userID'],
-              master_data['current_userID'],
+    return [  root_vector,
+              previous_vector,
+              current_vector,
               master_data['root_to_current_path_length'],
               text_data, 
               image_data,
@@ -124,7 +138,6 @@ if __name__ == '__main__':
   args, unknown = parser.parse_known_args()
   args = vars(args)
 
-  colnames = args['colnames']
   if args['header']:
     with open(args['header']) as f:
       colnames = f.readlines()[0].strip().split(",")
@@ -143,6 +156,7 @@ if __name__ == '__main__':
     label_files=label_files,
     label_map=label_map,
     text_files=text_files,
+    dummy_user_vector=args['dummy_user_vector'],
     image_files=image_files)
 
   dataset.__getitem__(3)

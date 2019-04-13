@@ -14,7 +14,7 @@ from src.utils import get_filenames
 
 class TwitterDataloader(object):
   """docstring for TwitterDataloader"""
-  def __init__(self, chunks, key, colnames, label_files, label_map, text_files, image_files, shuffle=False, batch_size=1024, num_workers=4):
+  def __init__(self, chunks, key, colnames, label_files, label_map, text_files, image_files, dummy_user_vector=False, shuffle=False, batch_size=1024, num_workers=4):
     super(TwitterDataloader, self).__init__()
 
     self.chunks = chunks
@@ -23,6 +23,8 @@ class TwitterDataloader(object):
     self.label_map = label_map
     self.text_files = text_files
     self.image_files = image_files
+    
+    self.dummy_user_vector = dummy_user_vector
     self.shuffle = shuffle
     self.batch_size = batch_size
     self.key = key
@@ -34,7 +36,7 @@ class TwitterDataloader(object):
     self.iterator = self.load_iterator(self.chunks[self.chunk_indx])
 
   def load_iterator(self, chunk):
-    self.twitter_dataset = TwitterDatasetChunk(chunk, self.key, self.colnames, self.label_files, self.label_map, self.text_files, self.image_files)
+    self.twitter_dataset = TwitterDatasetChunk(chunk, self.key, self.colnames, self.label_files, self.label_map, self.text_files, self.image_files, self.dummy_user_vector)
     self.dataloader = DataLoader(self.twitter_dataset, batch_size=self.batch_size,
                             shuffle=self.shuffle, num_workers=self.num_workers)
     return iter(self.dataloader)
@@ -70,7 +72,6 @@ if __name__ == '__main__':
   args, unknown = parser.parse_known_args()
   args = vars(args)
 
-  colnames = args['colnames']
   if args['header']:
     with open(args['header']) as f:
       colnames = f.readlines()[0].strip().split(",")
@@ -90,6 +91,7 @@ if __name__ == '__main__':
     label_map=label_map,
     text_files=text_files,
     image_files=image_files, 
+    dummy_user_vector=args['dummy_user_vector'],
     shuffle=False, batch_size=args['batch_size'], num_workers=4)
 
   for batch in dataloader: pass

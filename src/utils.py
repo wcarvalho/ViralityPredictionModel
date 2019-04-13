@@ -9,10 +9,15 @@ def get_filenames(files, keep_suffix=False):
 def tensor_is_set(tensor):
   try:
     tensor[0]
-  except TypeError as e:
+  except TypeError as te:
+    # if give None for tensor
     return False
-  except Exception as ep:
-    raise ep
+  except IndexError as ie:
+    # if give empty list for tensor
+    return False
+  except Exception as e:
+    # something else happened.
+    raise e
   return True
 
 def mkdir_p(path):
