@@ -68,6 +68,8 @@ def main(argv):
     value_list = []
     for single_file_info in tqdm(file_list, ncols=70):
         target_path = os.path.join(bucket_folder, '{}.npy'.format(single_file_info[0]))
+        if not os.path.exists(target_path):
+            continue
         npy_file = np.load(target_path)
         result_img = Variable(torch.from_numpy(npy_file).unsqueeze(0))
 
