@@ -42,17 +42,31 @@ def depth_loss(r_value, p_value, c_value, rc_length):
     import ipdb; ipdb.set_trace()
     raise (error)
 
-  if (r_value == 0.0).all():
-    import ipdb; ipdb.set_trace()
   r_log = (r_value+EPS).log()
   p_log = (p_value+EPS).log()
   c_log = (c_value+EPS).log()
 
-  rc_loss = F.mse_loss(r_log, (rc_length + c_value).log())  # log(r_value) = log(l + c_value)
-  rp_loss = F.mse_loss(r_log, (rc_length - 1 + p_value + EPS).log())  # r_value = l - 1 + c_value
-  pc_loss = F.mse_loss(p_log, c_log)                    # p_value = 1 + c_value
+  rc_loss = F.mse_loss(r_log, (rc_length + c_value).log())
+  rp_loss = F.mse_loss(r_log, (rc_length - 1 + p_value + EPS).log())
+  pc_loss = F.mse_loss(p_log, c_log)
 
   return rc_loss, rp_loss, pc_loss
+
+def match_sizes(batch_1, batch_2):
+  """For whichever batch is smaller. keep repeating its elements until you"""
+  s1 = len(batch_1)
+  s2 = len(batch_2)
+
+  if s2 < s1:
+    while s2 < s1:
+      difference = s1 - s2
+      batch_2 = torch.cat([batch_2, batch_2[:difference]], dim=0)
+  elif s1 < s2:
+    while s1 < s2:
+      difference = s2 - s1
+      batch_1 = torch.cat([batch_1, batch_1[:difference]], dim=0)
+
+  return batch_1, batch_2
 
 class Trainer(object):
   """docstring for Trainer"""
@@ -108,6 +122,7 @@ class Trainer(object):
 
     for epoch in pbar:
       note = ""
+
       self.model.train()
       train_loss = self.train_epoch(train_dataloader, backprop=True)
       if self.writer:
@@ -121,10 +136,10 @@ class Trainer(object):
         self.write_meters_to_tensorboard("valid", step)
       self.meters.reset()
 
+
       self.train_losses.append(train_loss)
       self.valid_losses.append(valid_loss)
 
-      self.valid_losses
       if valid_loss < self.min_valid:
         self.min_valid = valid_loss
         self.min_epoch = epoch
@@ -168,10 +183,15 @@ class Trainer(object):
     return epoch_loss
 
   def train_instance(self, train_batch, random_batch, backprop=False):
-
     # ---- Get data for computing outputs ---
     r_vector, p_vector, c_vector, rc_length, text_data, image_data, tree_size, max_depth, avg_depth = train_batch
     r_vector_other, p_vector_other, c_vector_other, _, _, _, _, _, _ = random_batch
+
+    # NOTE: the batches may be of different lengths so repeat the smaller one until this match. this is for positive/negative sampling so it's okay to repeat.
+    # FIXME: more elegant solution?
+    r_vector, r_vector_other = match_sizes(r_vector, r_vector_other)
+    p_vector, p_vector_other = match_sizes(p_vector, p_vector_other)
+    c_vector, c_vector_other = match_sizes(c_vector, c_vector_other)
 
     # ---- Put data on device (CPU OR GPU) ---
     r_vector = r_vector.to(self.device)
@@ -291,6 +311,9 @@ def main():
     model = nn.DataParallel(model)
 
   model = model.to(device)
+
+  print(model)
+
   optimizer = optim.Adam(model.parameters(), lr=args['learning_rate'])
 
   trainer = Trainer(model=model,

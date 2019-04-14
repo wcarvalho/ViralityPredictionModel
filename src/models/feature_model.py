@@ -97,24 +97,19 @@ class FeatureModel(nn.Module):
       )
     )
 
-    try:
-      p_followed_false = []
-      p_followed_false.append(self.FollowingPredictor(
-        torch.mul(p_embed,
-          content_embed.mul(self.FollowerUserEmbedder(p_vector_other)),
-        )))
-      p_followed_false.append(self.FollowingPredictor(
-        torch.mul(c_embed,
-          content_embed.mul(self.FollowerUserEmbedder(c_vector_other)),
-        )))
-      p_followed_false.append(self.FollowingPredictor(
-        torch.mul(r_embed,
-          content_embed.mul(self.FollowerUserEmbedder(r_vector_other)),
-        )))
-    except Exception as e:
-      print(e)
-      import ipdb; ipdb.set_trace()
-      raise e
+    p_followed_false = []
+    p_followed_false.append(self.FollowingPredictor(
+      torch.mul(p_embed,
+        content_embed.mul(self.FollowerUserEmbedder(p_vector_other)),
+      )))
+    p_followed_false.append(self.FollowingPredictor(
+      torch.mul(c_embed,
+        content_embed.mul(self.FollowerUserEmbedder(c_vector_other)),
+      )))
+    p_followed_false.append(self.FollowingPredictor(
+      torch.mul(r_embed,
+        content_embed.mul(self.FollowerUserEmbedder(r_vector_other)),
+      )))
 
     return p_followed_true, p_followed_false
 

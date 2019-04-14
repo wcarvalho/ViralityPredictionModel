@@ -38,7 +38,9 @@ def split_h5file(full_path):
   return [int(x) for x in filename.split("_")]
 
 def load_h5py_data(files, pid, data_type="text"):
+  print("starting binary search")
   file = binary_search(files, split_h5file, pid)
+  print("finished")
   # import ipdb; ipdb.set_trace()
   if not file:
     error = "Corresponding %s file for root_postID %d wasn't found..." % (data_type, p_id)
@@ -78,9 +80,12 @@ class TwitterDatasetChunk(Dataset):
     tree_size = []
     max_depth = []
     avg_depth = []
+
     # load labels
     if self.label_files:
+      print("starting binary search")
       label_file = binary_search(self.label_files, lambda x: self.label_map[x], p_id)
+      print("finished")
       if not label_file:
         raise RuntimeError("not label file found for pid %d " % p_id)
       if label_file != self.current_label_file: # load new one

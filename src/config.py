@@ -38,9 +38,11 @@ def load_parser():
 
   model = parser.add_argument_group("model settings")
   model.add_argument('-vs', '--vocab-size', type=int, default=13649798)
-  model.add_argument('-us', '--user-size', type=int, default=20, help='size of initial user vecto')
-  model.add_argument('--image-size', type=int, default=2048, help='size of initial image vecto')
-  model.add_argument('--text-size', type=int, default=768, help='size of initial text vecto')
+  model.add_argument('-us', '--user-size', type=int, default=20, help='size of initial user vector')
+  model.add_argument('--image-size', type=int, default=2048, help='size of initial image vector')
+  model.add_argument('--text-size', type=int, default=768, help='size of initial text vector')
+  model.add_argument('--hidden-size', type=int, default=256, help='size of initial text vector')
+  model.add_argument('--joint-embedding-size', type=int, default=256, help='size of initial text vector')
   model.add_argument('-dv', '--dummy-user-vector', action='store_true', default=False)
 
   return parser
