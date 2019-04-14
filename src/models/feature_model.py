@@ -97,23 +97,25 @@ class FeatureModel(nn.Module):
       )
     )
 
-    p_followed_false = []
-    p_followed_false.append(self.FollowingPredictor(
-      torch.mul(p_embed,
-        content_embed.mul(self.FollowerUserEmbedder(p_vector_other)),
-      )))
-    p_followed_false.append(self.FollowingPredictor(
-      torch.mul(c_embed,
-        content_embed.mul(self.FollowerUserEmbedder(c_vector_other)),
-      )))
-    p_followed_false.append(self.FollowingPredictor(
-      torch.mul(r_embed,
-        content_embed.mul(self.FollowerUserEmbedder(r_vector_other)),
-      )))
+    try:
+      p_followed_false = []
+      p_followed_false.append(self.FollowingPredictor(
+        torch.mul(p_embed,
+          content_embed.mul(self.FollowerUserEmbedder(p_vector_other)),
+        )))
+      p_followed_false.append(self.FollowingPredictor(
+        torch.mul(c_embed,
+          content_embed.mul(self.FollowerUserEmbedder(c_vector_other)),
+        )))
+      p_followed_false.append(self.FollowingPredictor(
+        torch.mul(r_embed,
+          content_embed.mul(self.FollowerUserEmbedder(r_vector_other)),
+        )))
+    except Exception as e:
+      print(e)
+      import ipdb; ipdb.set_trace()
+      raise e
 
-    # print([p.shape for p in p_followed_false])
-    # p_followed_false = torch.stack(p_followed_false)
-    # print(p_followed_true.shape, p_followed_false.shape)
     return p_followed_true, p_followed_false
 
   def forward(self, r_vector, p_vector, c_vector, r_vector_other, p_vector_other, c_vector_other, image, text):
@@ -140,7 +142,6 @@ class FeatureModel(nn.Module):
     target = self.ViralityPrediction(torch.mul(
       r_embed, content_embed))
 
-
     return p_followed_true, p_followed_false, p_value, c_value, r_value, target
 
 if __name__ == '__main__':
@@ -151,30 +152,8 @@ if __name__ == '__main__':
   args, unknown = parser.parse_known_args()
   args = vars(args)
 
-  if args['header']:
-    with open(args['header']) as f:
-      colnames = f.readlines()[0].strip().split(",")
-
-  label_files = args['label_filenames']
-  text_files = args['text_filenames']
-  image_files = args['image_filenames']
-
-  if not args['label_map']: raise RuntimeError("need map to find label files")
-  with open(args['label_map'], 'r') as f:
-    label_map = yaml.load(f)
-
-  dataloader = TwitterDataloader(chunks=args['master_filenames'],
-    colnames=colnames,
-    key=args['key'],
-    label_files=label_files,
-    label_map=label_map,
-    text_files=text_files,
-    image_files=image_files,
-    dummy_user_vector=args['dummy_user_vector'],
-    shuffle=False, batch_size=args['batch_size'], num_workers=4)
-
   model = FeatureModel(user_size=args['user_size'],
-    image_embed_size=1024,
-    text_embed_size=768,
-    hidden_size=256,
-    joint_embedding_size=256)
+    image_embed_size=args['image_size'],
+    text_embed_size=args['text_size'],
+    hidden_size=args['hidden_size'],
+    joint_embedding_size=args['joint_embedding_size'])

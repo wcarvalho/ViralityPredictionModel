@@ -40,8 +40,6 @@ def split_h5file(full_path):
 def load_h5py_data(files, pid, data_type="text"):
   file = binary_search(files, split_h5file, pid)
   # import ipdb; ipdb.set_trace()
-  print(file)
-  print(pid)
   if not file:
     error = "Corresponding %s file for root_postID %d wasn't found..." % (data_type, p_id)
     import ipdb; ipdb.set_trace()
