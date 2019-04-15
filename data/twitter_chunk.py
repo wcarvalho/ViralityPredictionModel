@@ -38,25 +38,27 @@ def split_h5file(full_path):
   return [int(x) for x in filename.split("_")]
 
 def load_h5py_data(files, pid, data_type="text"):
-  print("starting binary search")
   file = binary_search(files, split_h5file, pid)
-  print("finished")
   # import ipdb; ipdb.set_trace()
   if not file:
     error = "Corresponding %s file for root_postID %d wasn't found..." % (data_type, p_id)
     import ipdb; ipdb.set_trace()
     raise RuntimeError(error)
-  with h5py.File(file, 'r') as f:
-    return f[str(pid)].get(data_type)[()]
+  # print("opening h5py %s" % os.path.basename(file))
+  with h5py.File(file, 'r',  libver='latest', swmr=True) as f:
+    data = f[str(pid)].get(data_type)[()]
+  # print("closing h5py %s" % os.path.basename(file))
+  return data
 
 
 class TwitterDatasetChunk(Dataset):
   """docstring for TwitterDatasetChunk"""
-  def __init__(self, filename, key, colnames, label_files, label_map, text_files, image_files, dummy_user_vector=False):
+  def __init__(self, filename, key, colnames, user_size, label_files, label_map, text_files, image_files, dummy_user_vector=False):
     super(TwitterDatasetChunk, self).__init__()
 
     self.filename = filename
     self.colnames = colnames
+    self.user_size = user_size
     self.label_files = label_files
     self.label_map = label_map
     self.text_files = text_files
@@ -83,12 +85,11 @@ class TwitterDatasetChunk(Dataset):
 
     # load labels
     if self.label_files:
-      print("starting binary search")
       label_file = binary_search(self.label_files, lambda x: self.label_map[x], p_id)
-      print("finished")
       if not label_file:
         raise RuntimeError("not label file found for pid %d " % p_id)
       if label_file != self.current_label_file: # load new one
+        # print("opening csv %s" % os.path.basename(label_file))
         self.label_df = pd.read_csv(label_file, sep=",", names=['root_postID','tree_size','max_depth','avg_depth'], header=None)
         self.current_label_file = label_file
 
@@ -112,9 +113,9 @@ class TwitterDatasetChunk(Dataset):
       image_data = torch.from_numpy(image_data).float()
 
     if self.dummy_user_vector:
-      root_vector = torch.randn([20])
-      previous_vector = torch.randn([20])
-      current_vector = torch.randn([20])
+      root_vector = torch.randn([self.user_size])
+      previous_vector = torch.randn([self.user_size])
+      current_vector = torch.randn([self.user_size])
     else:
       master_data['root_userID']
       master_data['previous_userID']

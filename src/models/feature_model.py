@@ -32,11 +32,11 @@ class ContentGate(nn.Module):
 
 class JointContentEmbedder(nn.Module):
   """docstring for JointContentEmbedder"""
-  def __init__(self, image_embed_size, text_embed_size, hidden_size, output_size):
+  def __init__(self, image_embed_size, text_embed_size, hidden_size, output_size, n_hidden):
     super(JointContentEmbedder, self).__init__()
-    self.image_embedder = NeuralNetwork(image_embed_size, hidden_size, output_size, n_hidden=4)
+    self.image_embedder = NeuralNetwork(image_embed_size, hidden_size, output_size, n_hidden)
     self.image_gate = ContentGate(output_size)
-    self.text_embedder = NeuralNetwork(text_embed_size, hidden_size, output_size, n_hidden=4)
+    self.text_embedder = NeuralNetwork(text_embed_size, hidden_size, output_size, n_hidden)
     self.text_gate = ContentGate(output_size)
 
   def forward(self, image_content=None, text_content=None):
@@ -59,21 +59,21 @@ class JointContentEmbedder(nn.Module):
     else:
       raise NotImplementedError("Must give image or text embedding")
 
-
 class FeatureModel(nn.Module):
   """docstring for FeatureModel"""
   def __init__(self, user_size, image_embed_size, text_embed_size, hidden_size, joint_embedding_size):
     super(FeatureModel, self).__init__()
-    self.ContentEmbedder4Following = JointContentEmbedder(image_embed_size, text_embed_size, hidden_size, joint_embedding_size)
+    self.ContentEmbedder4Following = JointContentEmbedder(image_embed_size, text_embed_size, hidden_size, joint_embedding_size, n_hidden=4)
 
-    self.ContentEmbedder4Prediction = JointContentEmbedder(image_embed_size, text_embed_size, hidden_size, joint_embedding_size)
+    self.ContentEmbedder4Prediction = JointContentEmbedder(image_embed_size, text_embed_size, hidden_size, joint_embedding_size, n_hidden=4)
     
-    self.StartUserEmbedder = nn.Linear(user_size, joint_embedding_size)
+    self.StartUserEmbedder = NeuralNetwork(user_size, joint_embedding_size, 1, n_hidden=4)
 
-    self.FollowerUserEmbedder = nn.Linear(user_size, joint_embedding_size)
+    self.FollowerUserEmbedder = NeuralNetwork(user_size, joint_embedding_size, 1, n_hidden=4)
 
     self.FollowingPredictor = nn.Sequential(
-      nn.Linear(joint_embedding_size, 1), nn.Sigmoid()
+      NeuralNetwork(joint_embedding_size, hidden_size, 1, n_hidden=1),
+      nn.Sigmoid()
     )
 
     self.ViralityPrediction = nn.Sequential(
@@ -126,6 +126,7 @@ class FeatureModel(nn.Module):
 
     # MACROSCOPIC INFO: for depth recursion
     content_embed = self.ContentEmbedder4Prediction(image, text)
+
     p_value = self.DepthPrediction(torch.mul(
       p_embed, content_embed))
     c_value = self.DepthPrediction(torch.mul(

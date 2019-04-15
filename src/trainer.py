@@ -10,7 +10,7 @@ from torch.nn import functional as F
 import torch.optim as optim
 from tensorboardX import SummaryWriter
 
-from data.dataloader import TwitterDataloader
+from data.dataloader import load_train_valid_test_loaders
 from src.models.feature_model import FeatureModel
 from src.utils import path_exists, filepath_exists, AverageMeter, tensor_is_set
 
@@ -54,23 +54,27 @@ def depth_loss(r_value, p_value, c_value, rc_length):
 
 def match_sizes(batch_1, batch_2):
   """For whichever batch is smaller. keep repeating its elements until you"""
-  s1 = len(batch_1)
-  s2 = len(batch_2)
 
-  if s2 < s1:
-    while s2 < s1:
-      difference = s1 - s2
+  num_times = 0
+  if len(batch_2) < len(batch_1):
+    while len(batch_2) < len(batch_1):
+      difference = len(batch_1) - len(batch_2)
       batch_2 = torch.cat([batch_2, batch_2[:difference]], dim=0)
-  elif s1 < s2:
-    while s1 < s2:
-      difference = s2 - s1
+      num_times += 1
+      if num_times > 10: import ipdb; ipdb.set_trace()
+
+  elif len(batch_1) < len(batch_2):
+    while len(batch_1) < len(batch_2):
+      difference = len(batch_2) - len(batch_1)
       batch_1 = torch.cat([batch_1, batch_1[:difference]], dim=0)
+      num_times += 1
+      if num_times > 10: import ipdb; ipdb.set_trace()
 
   return batch_1, batch_2
 
 class Trainer(object):
   """docstring for Trainer"""
-  def __init__(self, model, optimizer, device, target_name="tree_size", seed=1, micro_lambda=1, macro_lambda=1, max_epoch=10, log_dir=None, checkpoint_file=None):
+  def __init__(self, model, optimizer, device, target_name="tree_size", seed=1, micro_lambda=1, macro_lambda=1, max_epoch=10, log_dir=None, checkpoint_file=None, verbosity=0):
     super(Trainer, self).__init__()
     self.model = model
     self.optimizer = optimizer
@@ -81,6 +85,7 @@ class Trainer(object):
     self.macro_lambda = macro_lambda
     self.max_epoch = max_epoch
     self.log_dir = log_dir
+    self.verbosity = verbosity
 
     self.start_epoch = self.min_epoch = 0
     self.min_valid = 1e10
@@ -167,7 +172,9 @@ class Trainer(object):
     pbar.set_description("target: 0, follow: 0, recur: 0")
     for batch_ind in pbar:
       batch_2 = next(data_iter)
+      if self.verbosity > 1: tqdm.write("\n------------\noutside: batch loaded")
       total_loss = self.train_instance(train_batch=batch_1, random_batch=batch_2, backprop=backprop)
+      if self.verbosity > 1: tqdm.write("outside: loss computed")
       epoch_loss += total_loss
 
       # ----- Set pbar/tqdm description --- 
@@ -189,9 +196,11 @@ class Trainer(object):
 
     # NOTE: the batches may be of different lengths so repeat the smaller one until this match. this is for positive/negative sampling so it's okay to repeat.
     # FIXME: more elegant solution?
+    if self.verbosity > 1: tqdm.write("\tmatching sizes starting")
     r_vector, r_vector_other = match_sizes(r_vector, r_vector_other)
     p_vector, p_vector_other = match_sizes(p_vector, p_vector_other)
     c_vector, c_vector_other = match_sizes(c_vector, c_vector_other)
+    if self.verbosity > 1: tqdm.write("\tmatching sizes done")
 
     # ---- Put data on device (CPU OR GPU) ---
     r_vector = r_vector.to(self.device)
@@ -205,9 +214,11 @@ class Trainer(object):
     r_vector_other = r_vector_other.to(self.device)
     p_vector_other = p_vector_other.to(self.device)
     c_vector_other = c_vector_other.to(self.device)
+    if self.verbosity > 1: tqdm.write("\tput data on device")
 
     # ---- Compute outputs ---
     p_followed_true, p_followed_false, p_value, c_value, r_value, pred_target = self.model(r_vector, p_vector, c_vector, r_vector_other, p_vector_other, c_vector_other, image_data, text_data)
+    if self.verbosity > 1: tqdm.write("\trun model over data")
 
     # ---- Compute Losses ---
     p_follow_loss = negative_sampling_loss(p_followed_true, p_followed_false)
@@ -226,12 +237,14 @@ class Trainer(object):
     target_loss = F.mse_loss(pred_target, target)
 
     total_loss = target_loss + self.micro_lambda*p_follow_loss + self.macro_lambda*recursive_loss
+    if self.verbosity > 1: tqdm.write("\tcomputed losses")
 
     # ---- Backprop ---
     if backprop:
       self.optimizer.zero_grad()
       total_loss.backward()
       self.optimizer.step()
+    if self.verbosity > 1: tqdm.write("\tbackprop")
 
     # ---- Record Losses ---
     batch_len = r_vector.shape[0]
@@ -242,6 +255,7 @@ class Trainer(object):
     self.meters['target_loss'].update(target_loss.item(), batch_len)
     self.meters['total_loss'].update(total_loss.item(), batch_len)
 
+    if self.verbosity > 1: tqdm.write("\trecord losses ")
     return total_loss
 
   def load_from_ckpt(self, checkpoint_file):
@@ -281,21 +295,17 @@ def main():
   args_to_print = {name:args[name] for name in args if not "filenames" in name}
   pprint(args_to_print)
 
-  if args['header']:
-    with open(args['header']) as f:
-      colnames = f.readlines()[0].strip().split(",")
-
-  if not args['label_map']: raise RuntimeError("need label map to find label files for corresponding master csv data")
-  with open(args['label_map'], 'r') as f:
-    label_map = yaml.load(f)
-
-  if not args['split_map']: raise RuntimeError("need map to split files into train/valid/test")
-  with open(args['split_map'], 'r') as f:
-    split_map = yaml.load(f)
-
-  split_map = {name: set(split_map[name]) for name in split_map}
-  train_files = [f for f in args['master_filenames'] if f in split_map['train']]
-  valid_files = [f for f in args['master_filenames'] if f in split_map['valid']]
+  colnames, label_map, split_map, train_files, valid_files, _, train_dataloader, valid_dataloader, _ = load_train_valid_loaders(
+      all_master_files=args['master_filenames'],
+      header_file=args['header'],
+      label_map_file=args['label_map'],
+      split_map_file=args['split_map'],
+      key=args['key'],
+      user_size=args['user_size'],
+      dummy_user_vector=args['dummy_user_vector'],
+      shuffle=args['shuffle'],
+      batch_size=args['batch_size'],
+      num_workers=args['num_workers'])
 
   device = torch.device("cpu" if (args['no_cuda'] or not torch.cuda.is_available()) else "cuda")
 
@@ -325,38 +335,9 @@ def main():
     macro_lambda=args['macro_lambda'],
     max_epoch=args['epochs'],
     log_dir=args['log_dir'],
-    checkpoint_file=args['checkpoint']
+    checkpoint_file=args['checkpoint'],
+    verbosity=args['verbosity']
   )
-
-  label_files = args['label_filenames']
-  text_files = args['text_filenames']
-  image_files = args['image_filenames']
-
-  train_dataloader = TwitterDataloader(
-    chunks=train_files,
-    colnames=colnames,
-    key=args['key'],
-    label_files=label_files,
-    label_map=label_map,
-    text_files=text_files,
-    image_files=image_files,
-    dummy_user_vector=args['dummy_user_vector'],
-    shuffle=args['shuffle'],
-    batch_size=args['batch_size'], 
-    num_workers=args['num_workers'])
-
-  valid_dataloader = TwitterDataloader(
-    chunks=valid_files,
-    colnames=colnames,
-    key=args['key'],
-    label_files=label_files,
-    label_map=label_map,
-    text_files=text_files,
-    image_files=image_files,
-    dummy_user_vector=args['dummy_user_vector'],
-    shuffle=False, 
-    batch_size=args['batch_size'], 
-    num_workers=args['num_workers'])
 
   trainer.train(train_dataloader, valid_dataloader)
 

@@ -8,6 +8,7 @@ def load_parser():
   logging = parser.add_argument_group("logging settings")
   logging.add_argument('-ld', '--log-dir', type=str, default='logs/feature_model/tb')
   logging.add_argument('-ckpt', '--checkpoint', type=str, default='logs/feature_model/ckpt.th')
+  logging.add_argument('-v', '--verbosity', type=int, default=0, help='1=important prints. 2=detailed prints.')
 
 
   file = parser.add_argument_group("file settings")
@@ -38,7 +39,7 @@ def load_parser():
 
   model = parser.add_argument_group("model settings")
   model.add_argument('-vs', '--vocab-size', type=int, default=13649798)
-  model.add_argument('-us', '--user-size', type=int, default=20, help='size of initial user vector')
+  model.add_argument('-us', '--user-size', type=int, default=10, help='size of initial user vector')
   model.add_argument('--image-size', type=int, default=2048, help='size of initial image vector')
   model.add_argument('--text-size', type=int, default=768, help='size of initial text vector')
   model.add_argument('--hidden-size', type=int, default=256, help='size of initial text vector')
