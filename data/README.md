@@ -10,15 +10,15 @@ split -l 100000 -d -a 6 /mnt/brain4/datasets/Twitter/junghwan_chunked/tree_label
 
 # create a pid_start,pid_end map for the labels
 python data/get_label_chunks_pid_map.py \
-  --files /mnt/brain4/datasets/Twitter/junghwan_chunked/label_chunks/* \
-  --header /mnt/brain4/datasets/Twitter/junghwan/target_label_header.csv \
+  --files /data/wcarvalh/twitter/junghwan_chunked/label_chunks/* \
+  --header /data/wcarvalh/twitter/junghwan/target_label_header.csv \
   --key root_postID \
-  --outfile /mnt/brain4/datasets/Twitter/junghwan_chunked/label_chunks_map.yaml
+  --outfile /data/wcarvalh/twitter/junghwan_chunked/label_chunks_map.yaml
 
 # now split data based on root_pid and using labels file into train/validation/test
 python data/create_train_valid_test.py \
-  --files /mnt/brain4/datasets/Twitter/junghwan_chunked/data_chunks/* \
-  --header /mnt/brain4/datasets/Twitter/junghwan_chunked/rc_path_header.csv \
+  --files /data/wcarvalh/twitter/junghwan_chunked/data_chunks/* \
+  --header /data/wcarvalh/twitter/junghwan_chunked/rc_path_header.csv \
   --key root_postID \
-  --outfile /mnt/brain4/datasets/Twitter/junghwan_chunked/split_map.yaml
+  --outfile /data/wcarvalh/twitter/junghwan_chunked/split_map.yaml
 ```

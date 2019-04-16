@@ -26,7 +26,6 @@ if __name__ == '__main__':
 
   filepath_exists(args['outfile'])
 
-  colnames = args['colnames']
   if args['header']:
     with open(args['header']) as f:
       colnames = f.readlines()[0].strip().split(",")
@@ -34,7 +33,7 @@ if __name__ == '__main__':
   ends = {}
   for file in tqdm(args['files']):
     df = pd.read_csv(file, sep=",", names=colnames, header=None)
-    ends[file] = [int(df[args['key']].min()), int(df[args['key']].max())]
+    ends[os.path.basename(file)] = [int(df[args['key']].min()), int(df[args['key']].max())]
     del df
 
   pprint(ends)

@@ -1,5 +1,5 @@
 import os
-
+import glob
 import numpy as np
 import yaml
 from tqdm import tqdm
@@ -11,6 +11,7 @@ import torch.optim as optim
 from tensorboardX import SummaryWriter
 
 from data.dataloader import load_train_valid_test_loaders
+from data.twitter_chunk import TwitterDatasetChunk, close_h5py_filelist, open_data_files
 from src.models.feature_model import FeatureModel
 from src.utils import path_exists, filepath_exists, AverageMeter, tensor_is_set
 
@@ -91,6 +92,7 @@ class Trainer(object):
     self.min_valid = 1e10
     self.patience = 20
     self.patience_used = 0
+    self.iteration = 0
     self.train_losses = []
     self.valid_losses = []
 
@@ -131,15 +133,15 @@ class Trainer(object):
       self.model.train()
       train_loss = self.train_epoch(train_dataloader, backprop=True)
       if self.writer:
-        self.write_meters_to_tensorboard("train", step)
-      self.meters.reset()
+        self.write_meters_to_tensorboard("train", epoch)
+      for meter in self.meters: self.meters[meter].reset()
 
 
       self.model.eval()
       valid_loss = self.train_epoch(valid_dataloader, backprop=False)
       if self.writer:
-        self.write_meters_to_tensorboard("valid", step)
-      self.meters.reset()
+        self.write_meters_to_tensorboard("valid", epoch)
+      for meter in self.meters: self.meters[meter].reset()
 
 
       self.train_losses.append(train_loss)
@@ -168,10 +170,9 @@ class Trainer(object):
     batch_0 = next(data_iter)
     batch_1 = batch_0
     epoch_loss = 0
-    pbar = tqdm(range(len(dataloader)-1))
+    pbar = tqdm(data_iter)
     pbar.set_description("target: 0, follow: 0, recur: 0")
-    for batch_ind in pbar:
-      batch_2 = next(data_iter)
+    for batch_2 in pbar:
       if self.verbosity > 1: tqdm.write("\n------------\noutside: batch loaded")
       total_loss = self.train_instance(train_batch=batch_1, random_batch=batch_2, backprop=backprop)
       if self.verbosity > 1: tqdm.write("outside: loss computed")
@@ -184,6 +185,11 @@ class Trainer(object):
         self.meters['rc_loss'].average + self.meters['rp_loss'].average + self.meters['pc_loss'].average
         ))
       batch_1 = batch_2
+      if self.iteration % 200 == 1 and backprop:
+        self.save_to_ckpt(self.checkpoint_file, self.iteration)
+        if self.writer:
+          self.write_meters_to_tensorboard("step-wise", self.iteration)
+      self.iteration += 1
 
     # for last instance, use batch 0 as the "random" batch
     epoch_loss += self.train_instance(train_batch=batch_2, random_batch=batch_0)
@@ -197,9 +203,10 @@ class Trainer(object):
     # NOTE: the batches may be of different lengths so repeat the smaller one until this match. this is for positive/negative sampling so it's okay to repeat.
     # FIXME: more elegant solution?
     if self.verbosity > 1: tqdm.write("\tmatching sizes starting")
-    r_vector, r_vector_other = match_sizes(r_vector, r_vector_other)
-    p_vector, p_vector_other = match_sizes(p_vector, p_vector_other)
-    c_vector, c_vector_other = match_sizes(c_vector, c_vector_other)
+    if len(r_vector) != len(r_vector_other): return 0
+    # r_vector, r_vector_other = match_sizes(r_vector, r_vector_other)
+    # p_vector, p_vector_other = match_sizes(p_vector, p_vector_other)
+    # c_vector, c_vector_other = match_sizes(c_vector, c_vector_other)
     if self.verbosity > 1: tqdm.write("\tmatching sizes done")
 
     # ---- Put data on device (CPU OR GPU) ---
@@ -259,11 +266,17 @@ class Trainer(object):
     return total_loss
 
   def load_from_ckpt(self, checkpoint_file):
+    file, suffix=os.path.splitext(checkpoint_file)
+
+    checkpoints = sorted(glob.glob("%s*" % file))
+    checkpoint_file = checkpoints[-1]
+
     print("loading %s" % checkpoint_file)
     checkpoint = torch.load(checkpoint_file)
     self.start_epoch = self.min_epoch = checkpoint['epoch'] + 1
     self.min_valid = checkpoint['min_valid']
     self.patience_used = checkpoint['patience_used']
+    self.iteration = checkpoint['iteration']
     self.train_losses = checkpoint['train_losses']
     self.valid_losses = checkpoint['valid_losses']
     self.model.load_state_dict(checkpoint['model'])
@@ -271,13 +284,17 @@ class Trainer(object):
     torch.manual_seed(checkpoint['seed'])
     np.random.seed(checkpoint['seed'])
 
-  def save_to_ckpt(self, checkpoint_file):
+  def save_to_ckpt(self, checkpoint_file, iteration=None):
+    if iteration:
+      file, suffix=os.path.splitext(checkpoint_file)
+      checkpoint_file = "%s_%.5d%s" % (file, iteration, suffix)
     torch.save({
         'epoch': self.min_epoch,
         'min_valid': self.min_valid,
         'model': self.model.state_dict(),
         'optimizer': self.optimizer.state_dict(),
         'seed': self.seed,
+        'iteration': self.iteration,
         'patience_used' : self.patience_used,
         'train_losses': self.train_losses,
         'valid_losses': self.valid_losses,
@@ -295,17 +312,43 @@ def main():
   args_to_print = {name:args[name] for name in args if not "filenames" in name}
   pprint(args_to_print)
 
-  colnames, label_map, split_map, train_files, valid_files, _, train_dataloader, valid_dataloader, _ = load_train_valid_loaders(
-      all_master_files=args['master_filenames'],
+  if args['split_map'] and args['master_filenames']:
+    with open(args['split_map'], 'r') as f:
+      split_map = yaml.load(f, Loader=yaml.FullLoader)
+      split_map = {name: set(split_map[name]) for name in split_map}
+
+      train_files = [f for f in args['master_filenames'] if os.path.basename(f) in split_map['train']]
+      valid_files = [f for f in args['master_filenames'] if os.path.basename(f) in split_map['valid']]
+      test_files = [f for f in args['master_filenames'] if os.path.basename(f) in split_map['test']]
+  elif args['master_filenames'] and not args['split_map']:
+    raise RuntimeError("need map to split master-filenames into train/valid/test")
+  else:
+    train_files = args['train_filenames']
+    valid_files = args['valid_filenames']
+    test_files = args['test_filenames']
+
+
+  text_files, image_files, label_files = open_data_files(args['text_filenames'], args['image_filenames'], args['label_filenames'])
+
+  colnames, label_map, train_dataloader, valid_dataloader, _ = load_train_valid_test_loaders(
+      train_files=train_files,
+      valid_files=valid_files,
+      test_files=test_files,
       header_file=args['header'],
       label_map_file=args['label_map'],
-      split_map_file=args['split_map'],
+      label_files = label_files,
+      text_files = text_files,
+      image_files = image_files,
       key=args['key'],
       user_size=args['user_size'],
+      text_size=args['text_size'],
+      image_size=args['image_size'],
       dummy_user_vector=args['dummy_user_vector'],
       shuffle=args['shuffle'],
       batch_size=args['batch_size'],
-      num_workers=args['num_workers'])
+      num_workers=args['num_workers']
+      )
+
 
   device = torch.device("cpu" if (args['no_cuda'] or not torch.cuda.is_available()) else "cuda")
 

@@ -7,7 +7,7 @@
 #   --key root_postID \
 #   --dummy-user-vector
 
-ipython data/dataloader.py -- \
+ipython data/stupidDataset.py -- \
   --master-filenames /mnt/brain4/datasets/Twitter/junghwan_chunked/data_chunks/* \
   --label-filenames /mnt/brain4/datasets/Twitter/junghwan_chunked/label_chunks/* \
   --text-filenames /mnt/brain4/datasets/Twitter/final/text/* \

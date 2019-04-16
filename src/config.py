@@ -13,18 +13,23 @@ def load_parser():
 
   file = parser.add_argument_group("file settings")
   file.add_argument('-mf', '--master-filenames', type=str, nargs='+', default=[])
+  file.add_argument('--train-filenames', type=str, nargs='+', default=[])
+  file.add_argument('--valid-filenames', type=str, nargs='+', default=[])
+  file.add_argument('--test-filenames', type=str, nargs='+', default=[])
   file.add_argument('-lf', '--label-filenames', type=str, nargs='+', default=[])
   file.add_argument('-lm', '--label-map', type=str, default=None, help='dict with start,end pids of label chunks')
-  file.add_argument('-s,', '--split-map', type=str, default=None, help='dictionary with train/valid/test splits for --master-filenames')
+  file.add_argument('-s,', '--split-map', type=str, default=None, help='dictionary with train/valid/test splits for --master-filenames. or you can use train/valid/test-filenames')
   file.add_argument('-if', '--image-filenames', type=str, nargs='+', default=[])
   file.add_argument('-tf', '--text-filenames', type=str, nargs='+', default=[])
   file.add_argument('-k', '--key', type=str, default="root_postID")
   file.add_argument('-he', '--header', type=str, default=None)
+  file.add_argument('--max-label-files-open', type=int, default=2)
+  file.add_argument('--max-hfpy-files-open', type=int, default=2)
 
 
 
   training = parser.add_argument_group("training settings")
-  training.add_argument('-bs', '--batch-size', type=int, default=1024)
+  training.add_argument('-bs', '--batch-size', type=int, default=256)
   training.add_argument('-s', '--seed', type=int, default=1)
   training.add_argument('-e', '--epochs', type=int, default=1000)
   training.add_argument('--macro-lambda', type=int, default=1)
