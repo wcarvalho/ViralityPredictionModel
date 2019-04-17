@@ -9,7 +9,7 @@ def load_parser():
   logging.add_argument('-ld', '--log-dir', type=str, default=None)
   logging.add_argument('-ckpt', '--checkpoint', type=str, default=None)
   logging.add_argument('-v', '--verbosity', type=int, default=0, help='1=important prints. 2=detailed prints.')
-  logging.add_argument('-sf', '--save-frequency', type=int, default=200, help='save every k batches. useful for big data')
+  logging.add_argument('-sf', '--save-frequency', type=int, default=1000, help='save every k batches. useful for big data')
 
 
   file = parser.add_argument_group("file settings")

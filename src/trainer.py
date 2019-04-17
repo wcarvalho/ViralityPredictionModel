@@ -128,6 +128,7 @@ class Trainer(object):
     self.save_frequency = save_frequency
 
     self.start_epoch = self.min_epoch = 0
+    self.start_batch_indx = 0
     self.min_valid = 1e10
     self.patience = 20
     self.patience_used = 0
@@ -138,12 +139,14 @@ class Trainer(object):
     torch.manual_seed(seed)
     np.random.seed(seed)
 
+    self.meters = {meter: AverageMeter() for meter in ['negative_sampling_loss', 'rc_loss', 'rp_loss', 'pc_loss', 'tree_size_loss', 'max_depth_loss', 'avg_depth_loss', 'target_loss', 'total_loss']}
+
     self.checkpoint_file = checkpoint_file
     if checkpoint_file:
       filepath_exists(checkpoint_file)
 
-      if os.path.exists(checkpoint_file):
-        self.load_from_ckpt(checkpoint_file)
+      self.load_from_ckpt(checkpoint_file)
+
 
     if log_dir:
       path_exists(log_dir)
@@ -152,11 +155,11 @@ class Trainer(object):
     else:
       self.writer = None
 
-    self.meters = {meter: AverageMeter() for meter in ['negative_sampling_loss', 'rc_loss', 'rp_loss', 'pc_loss', 'tree_size_loss', 'max_depth_loss', 'avg_depth_loss', 'target_loss', 'total_loss']}
 
   def write_meters_to_tensorboard(self, name, step):
     for meter in self.meters:
       self.writer.add_scalar("%s/%s" % (name, meter), self.meters[meter].average, step)
+    tqdm.write("wrote to tensorboardX for %s" % name)
 
   def train(self, train_data_files, train_image_files, train_text_files, train_label_files, valid_data_files, valid_image_files, valid_text_files, valid_label_files):
 
@@ -190,7 +193,7 @@ class Trainer(object):
         self.min_valid = valid_loss
         self.min_epoch = epoch
         self.patience_used = 0
-        self.checkpoint_file: self.save_to_ckpt(self.checkpoint_file)
+        self.checkpoint_file: self.save_to_ckpt(self.checkpoint_file, epoch=True)
         note = "NEW MINIMUM"
       else:
         self.patience_used += 1
@@ -206,7 +209,7 @@ class Trainer(object):
   def train_epoch(self, data_files, image_files, text_files, label_files, backprop=False):
 
     pbar = tqdm(zip(data_files, image_files, text_files, label_files), total=len(data_files))
-    pbar.set_description("file=0. batch=0. target: 0, follow: 0, recur: 0")
+    pbar.set_description("file=0. batch=0. iter=0. target: 0, follow: 0, recur: 0")
 
     total_batch_indx = 0
     epoch_loss = 0
@@ -233,6 +236,12 @@ class Trainer(object):
           batch_0 = batch
           batch_1 = batch_0
         else:
+          if total_batch_indx < self.start_batch_indx:
+            pass
+            # total_batch_indx += 1
+            # continue
+          else:
+            self.start_batch_indx = total_batch_indx
           # otherwise act regularly
           batch_2 = batch
           if self.verbosity > 1: tqdm.write("\n------------\noutside: batch loaded")
@@ -243,15 +252,16 @@ class Trainer(object):
 
           # set next batch_1 to current batch_2 and work on that
           batch_1 = batch_2
+
           if self.iteration % self.save_frequency == 1 and backprop:
-            self.checkpoint_file: self.save_to_ckpt(self.checkpoint_file, self.iteration)
-            if self.writer: self.write_meters_to_tensorboard("batch-wise", self.iteration)
+            if self.checkpoint_file: self.save_to_ckpt(self.checkpoint_file, self.iteration)
+          if self.writer: self.write_meters_to_tensorboard("batch-wise", self.iteration)
           self.iteration += 1
 
 
         # ----- Set pbar/tqdm description --- 
-        pbar.set_description("file=%d. batch=%d. target: %.2f, follow: %.2f, recur: %.2f" % (
-          file_indx, batch_indx,
+        pbar.set_description("file=%d. batch=%d. iter=%d. target: %.2f, follow: %.2f, recur: %.2f" % (
+          file_indx, batch_indx, self.iteration,
           self.meters['target_loss'].average,
           self.meters['negative_sampling_loss'].average,
           self.meters['rc_loss'].average + self.meters['rp_loss'].average + self.meters['pc_loss'].average
@@ -260,7 +270,7 @@ class Trainer(object):
 
 
     # for last instance, use batch 0 as the "random" batch
-    epoch_loss += self.train_instance(train_batch=batch_2, random_batch=batch_0)
+    # epoch_loss += self.train_instance(train_batch=batch_2, random_batch=batch_0)
     return epoch_loss
 
   def train_instance(self, train_batch, random_batch, backprop=False):
@@ -345,37 +355,67 @@ class Trainer(object):
   def load_from_ckpt(self, checkpoint_file):
     file, suffix=os.path.splitext(checkpoint_file)
 
-    checkpoints = sorted(glob.glob("%s*" % file))
-    checkpoint_file = checkpoints[-1]
+    iter_checkpoints = sorted(glob.glob("%s_iter*" % file))
+    best_epoch_checkpoints = sorted(glob.glob("%s_epoch*" % file))
 
-    print("loading %s" % checkpoint_file)
+    if not len(best_epoch_checkpoints) and not len(iter_checkpoints): return
+    elif not len(best_epoch_checkpoints):
+      checkpoint_file = iter_checkpoints[-1]
+    elif not len(best_epoch_checkpoints):
+      checkpoint_file = iter_checkpoints[-1]
+    else:
+      # both avaialble
+      iter_checkpoint_file = iter_checkpoints[-1]
+      best_epoch_checkpoint_file = best_epoch_checkpoints[-1]
+
+      # pick the latest of the two
+      if os.path.getctime(best_epoch_checkpoints) >= os.path.getctime(iter_checkpoint_file):
+        checkpoint_file = best_epoch_checkpoints
+      else:
+        checkpoint_file = iter_checkpoint_file
+
+
     checkpoint = torch.load(checkpoint_file)
-    self.start_epoch = self.min_epoch = checkpoint['epoch'] + 1
+    self.start_epoch = self.min_epoch = checkpoint['epoch'] + 1 if checkpoint_file == best_epoch_checkpoints else checkpoint['epoch']
     self.min_valid = checkpoint['min_valid']
     self.patience_used = checkpoint['patience_used']
     self.iteration = checkpoint['iteration']
+    self.start_batch_indx = checkpoint['start_batch_indx']
     self.train_losses = checkpoint['train_losses']
     self.valid_losses = checkpoint['valid_losses']
     self.model.load_state_dict(checkpoint['model'])
     self.optimizer.load_state_dict(checkpoint['optimizer'])
+
+    for name in self.meters:
+      self.meters[name].update(checkpoint[name], checkpoint["count"])
+
     torch.manual_seed(checkpoint['seed'])
     np.random.seed(checkpoint['seed'])
 
-  def save_to_ckpt(self, checkpoint_file, iteration=None):
+  def save_to_ckpt(self, checkpoint_file, iteration=None, epoch=False):
+
+    file, suffix=os.path.splitext(checkpoint_file)
     if iteration:
-      file, suffix=os.path.splitext(checkpoint_file)
-      checkpoint_file = "%s_%.5d%s" % (file, iteration, suffix)
-    torch.save({
-        'epoch': self.min_epoch,
-        'min_valid': self.min_valid,
-        'model': self.model.state_dict(),
-        'optimizer': self.optimizer.state_dict(),
-        'seed': self.seed,
-        'iteration': self.iteration,
-        'patience_used' : self.patience_used,
-        'train_losses': self.train_losses,
-        'valid_losses': self.valid_losses,
-      }, checkpoint_file)
+      checkpoint_file = "%s_iter_%.5d%s" % (file, iteration, suffix)
+
+    if epoch:
+      checkpoint_file = "%s_epoch_%.5d_BEST_%s" % (file, min_epoch, suffix)
+
+    to_save = {name: self.meters[name].average for name in self.meters}
+    to_save['count'] = next(iter(self.meters.items()))[1].count
+    to_save.update({
+            'epoch': self.min_epoch,
+            'min_valid': self.min_valid,
+            'model': self.model.state_dict(),
+            'optimizer': self.optimizer.state_dict(),
+            'seed': self.seed,
+            'start_batch_indx': self.start_batch_indx,
+            'iteration': self.iteration,
+            'patience_used' : self.patience_used,
+            'train_losses': self.train_losses,
+            'valid_losses': self.valid_losses,
+          })
+    torch.save(to_save, checkpoint_file)
     print("Saving %s" % checkpoint_file)
 
 def main():
