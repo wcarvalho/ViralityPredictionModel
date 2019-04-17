@@ -130,7 +130,7 @@ class Trainer(object):
     self.start_epoch = self.min_epoch = 0
     self.start_batch_indx = 0
     self.min_valid = 1e10
-    self.patience = 20
+    self.patience = 100
     self.patience_used = 0
     self.iteration = 0
     self.train_losses = []
@@ -169,18 +169,25 @@ class Trainer(object):
 
     pbar.set_description("Epoch %d. Train loss=%.2f, Valid loss = %.2f" % (self.start_epoch, train_loss, valid_loss))
 
+    ntrain_files = len(train_data_files)
+    nvalid_files = len(valid_data_files)
+
     for epoch in pbar:
       note = ""
-
       self.model.train()
-      train_loss = self.train_epoch(train_data_files, train_image_files, train_text_files, train_label_files, backprop=True)
+      self.model.zero_grad()
+      torch.cuda.empty_cache()
+      train_loss = self.train_epoch([train_data_files[epoch % ntrain_files]], [train_image_files[epoch % ntrain_files]], [train_text_files[epoch % ntrain_files]], [train_label_files[epoch % ntrain_files]], backprop=True)
       if self.writer:
         self.write_meters_to_tensorboard("train", epoch)
       for meter in self.meters: self.meters[meter].reset()
 
 
       self.model.eval()
-      valid_loss = self.train_epoch(valid_data_files, valid_image_files, valid_text_files, valid_label_files, backprop=False)
+      self.model.zero_grad()
+      torch.cuda.empty_cache()
+      with torch.no_grad():
+        valid_loss = self.train_epoch([valid_data_files[epoch % nvalid_files]], [valid_image_files[epoch % nvalid_files]], [valid_text_files[epoch % nvalid_files]], [valid_label_files[epoch % nvalid_files]], backprop=False)
       if self.writer:
         self.write_meters_to_tensorboard("valid", epoch)
       for meter in self.meters: self.meters[meter].reset()
@@ -193,23 +200,23 @@ class Trainer(object):
         self.min_valid = valid_loss
         self.min_epoch = epoch
         self.patience_used = 0
-        self.checkpoint_file: self.save_to_ckpt(self.checkpoint_file, epoch=True)
+        if self.checkpoint_file: self.save_to_ckpt(self.checkpoint_file, epoch=True)
         note = "NEW MINIMUM"
       else:
         self.patience_used += 1
         note = "patience increased to %d" % self.patience_used
 
 
-      if self.patience_used >= self.patience:
-        print("patience exceeded. training finished")
-        break
+      # if self.patience_used >= self.patience:
+        # print("patience exceeded. training finished")
+        # break
 
-      pbar.set_description("Epoch %d. Train loss=%.2f, Valid loss = %.2f.%s" % (self.start_epoch, train_loss, valid_loss, note))
+      pbar.set_description("Epoch %d. Train loss=%.2f, Valid loss = %.2f. %s" % (epoch, train_loss, valid_loss, note))
 
   def train_epoch(self, data_files, image_files, text_files, label_files, backprop=False):
 
     pbar = tqdm(zip(data_files, image_files, text_files, label_files), total=len(data_files))
-    pbar.set_description("file=0. batch=0. iter=0. target: 0, follow: 0, recur: 0")
+    pbar.set_description("iter=0. target: 0, follow: 0, recur: 0")
 
     total_batch_indx = 0
     epoch_loss = 0
@@ -246,6 +253,7 @@ class Trainer(object):
           batch_2 = batch
           if self.verbosity > 1: tqdm.write("\n------------\noutside: batch loaded")
           # get loss
+          self.model.zero_grad()
           total_loss = self.train_instance(train_batch=batch_1, random_batch=batch_2, backprop=backprop)
           if self.verbosity > 1: tqdm.write("outside: loss computed")
           epoch_loss += total_loss
@@ -253,25 +261,24 @@ class Trainer(object):
           # set next batch_1 to current batch_2 and work on that
           batch_1 = batch_2
 
-          if self.iteration % self.save_frequency == 1 and backprop:
-            if self.checkpoint_file: self.save_to_ckpt(self.checkpoint_file, self.iteration)
+          # if self.iteration % self.save_frequency == 1 and backprop:
+            # if self.checkpoint_file: self.save_to_ckpt(self.checkpoint_file, self.iteration)
           if self.writer: self.write_meters_to_tensorboard("batch-wise", self.iteration)
-          self.iteration += 1
 
 
         # ----- Set pbar/tqdm description --- 
-        pbar.set_description("file=%d. batch=%d. iter=%d. target: %.2f, follow: %.2f, recur: %.2f" % (
-          file_indx, batch_indx, self.iteration,
+        pbar.set_description("iter=%d. target: %.2f, follow: %.2f, recur: %.2f" % (
+          self.iteration,
           self.meters['target_loss'].average,
           self.meters['negative_sampling_loss'].average,
           self.meters['rc_loss'].average + self.meters['rp_loss'].average + self.meters['pc_loss'].average
           ))
         total_batch_indx += 1
 
-
+      dataset.close()
     # for last instance, use batch 0 as the "random" batch
     # epoch_loss += self.train_instance(train_batch=batch_2, random_batch=batch_0)
-    return epoch_loss
+    return epoch_loss/total_batch_indx
 
   def train_instance(self, train_batch, random_batch, backprop=False):
     # ---- Get data for computing outputs ---
@@ -335,6 +342,7 @@ class Trainer(object):
       self.optimizer.zero_grad()
       total_loss.backward()
       self.optimizer.step()
+      self.iteration += 1
     if self.verbosity > 1: tqdm.write("\tbackprop")
 
     # ---- Record Losses ---
@@ -361,8 +369,8 @@ class Trainer(object):
     if not len(best_epoch_checkpoints) and not len(iter_checkpoints): return
     elif not len(best_epoch_checkpoints):
       checkpoint_file = iter_checkpoints[-1]
-    elif not len(best_epoch_checkpoints):
-      checkpoint_file = iter_checkpoints[-1]
+    elif not len(iter_checkpoints):
+      checkpoint_file = best_epoch_checkpoints[-1]
     else:
       # both avaialble
       iter_checkpoint_file = iter_checkpoints[-1]
@@ -399,7 +407,7 @@ class Trainer(object):
       checkpoint_file = "%s_iter_%.9d%s" % (file, iteration, suffix)
 
     if epoch:
-      checkpoint_file = "%s_epoch_%.5d_BEST_%s" % (file, min_epoch, suffix)
+      checkpoint_file = "%s_epoch_%.5d_BEST%s" % (file, self.min_epoch, suffix)
 
     to_save = {name: self.meters[name].average for name in self.meters}
     to_save['count'] = next(iter(self.meters.items()))[1].count

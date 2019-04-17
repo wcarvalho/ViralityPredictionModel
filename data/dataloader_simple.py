@@ -45,7 +45,7 @@ def main():
   batch_size = args['batch_size']
   num_workers = args['num_workers']
 
-  train_data_files, train_image_files, train_text_files, train_label_files = get_overlapping_data_files(train_data_files, train_image_files, train_text_files, train_label_files)
+  train_data_files[6:], train_image_files[6:], train_text_files[6:], train_label_files[6:] = get_overlapping_data_files(train_data_files, train_image_files, train_text_files, train_label_files)
 
   for train_data_file, train_image_file, train_text_file, train_label_file in tqdm(zip(train_data_files, train_image_files, train_text_files, train_label_files), desc="files"):
       dataset = TwitterDatasetChunk(

@@ -79,16 +79,21 @@ class TwitterDatasetChunk(Dataset):
     max_depth = []
     avg_depth = []
     if self.label_file:
-      tree_size = self.labels[self.labels['root_postID'] == pid]['tree_size'].unique()
-      max_depth = self.labels[self.labels['root_postID'] == pid]['max_depth'].unique()
-      avg_depth = self.labels[self.labels['root_postID'] == pid]['avg_depth'].unique()
-      tree_size = torch.from_numpy(tree_size)
-      max_depth = torch.from_numpy(max_depth)
-      avg_depth = torch.from_numpy(avg_depth)
 
-      if len(tree_size) > 1: 
-        import ipdb; ipdb.set_trace()
-        raise RuntimeError("why do you get multiple values for a single root_postID?")
+      tree_size = self.labels[self.labels['root_postID'] == pid]['tree_size'].unique()[0]
+      max_depth = self.labels[self.labels['root_postID'] == pid]['max_depth'].unique()[0]
+      avg_depth = self.labels[self.labels['root_postID'] == pid]['avg_depth'].unique()[0]
+      tree_size = torch.tensor(tree_size)
+      max_depth = torch.tensor(max_depth)
+      avg_depth = torch.tensor(avg_depth)
+
+      # if len(tree_size) > 1: 
+      #   tree_size = tree_size[:1]
+      #   max_depth = max_depth[:1]
+      #   avg_depth = avg_depth[:1]
+
+        # import ipdb; ipdb.set_trace()
+        # raise RuntimeError("why do you get multiple values for a single root_postID?")
 
     text_data = []
     if self.text_file:
@@ -107,7 +112,6 @@ class TwitterDatasetChunk(Dataset):
       root_vector = torch.from_numpy(data[self.data_header[10:20]].values).float()
       previous_vector = torch.from_numpy(data[self.data_header[20:30]].values).float()
       current_vector = torch.from_numpy(data[self.data_header[30:]].values).float()
-  
 
     return [  root_vector,
               previous_vector,
@@ -122,7 +126,7 @@ class TwitterDatasetChunk(Dataset):
 
 
   def __del__(self):
-    print("closing %s and friends" % self.data_file)
+    # print("closing %s and friends" % self.data_file)
     self.close()
 
   def close(self):
@@ -148,10 +152,10 @@ def main():
     with open(args['label_header']) as f:
       label_header = f.readlines()[0].strip().split(",")
 
-  data_file = args['train_data_files'][0]
-  image_file = args['train_image_files'][0]
-  text_file = args['train_text_files'][0]
-  label_file = args['train_label_files'][0]
+  data_file = args['train_data_files'][6]
+  image_file = args['train_image_files'][6]
+  text_file = args['train_text_files'][6]
+  label_file = args['train_label_files'][6]
   key = args['key']
   user_size = args['user_size']
   text_size = args['text_size']
@@ -175,7 +179,7 @@ def main():
   dataloader = DataLoader(dataset, batch_size=args['batch_size'],
                             shuffle=args['shuffle'], num_workers=args['num_workers'])
 
-  for batch in tqdm(data_loader): pass
+  for batch in tqdm(dataloader): pass
 
 if __name__ == '__main__':
   main()
