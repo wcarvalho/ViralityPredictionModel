@@ -94,7 +94,8 @@ def create_corresponding_h5py(csv_file, target_file, iterator, min_pid, max_pid,
 def chunks_between_pids(chunks, min_pid, max_pid):
 
   for chunk in tqdm(chunks, desc="chunks"):
-    yield chunk[chunk['root_postID'] >= min_pid][chunk['root_postID'] <= max_pid], chunk[chunk['root_postID'] > max_pid]
+    greater = chunk[chunk['root_postID'] >= min_pid]
+    yield greater[greater['root_postID'] <= max_pid], chunk[chunk['root_postID'] > max_pid]
 
     # if mask.all():
     #   yield chunk, None, False # nothing outside
@@ -156,25 +157,25 @@ def main():
         break
 
     filename = os.path.splitext(os.path.basename(text_file))[0]
-    target_file = os.path.join(args['data_outdir'], filename)
 
-    target_csv = target_file+".csv"
+
+    target_csv = os.path.join(args['data_outdir'], filename)+".csv"
     if os.path.exists(target_csv):
-      tqdm.write("%s exists" % os.path.basename(target_csv))
+      tqdm.write("\n%s exists" % os.path.basename(target_csv))
     else:
       if relevant_chunks:
         # you have a valid csv
         # create df from those and write it to the path using the same filename
         main_df_chunk = pd.concat(relevant_chunks)
         main_df_chunk.to_csv(target_csv, header=None, index=False)
-        tqdm.write("saved %s" % os.path.basename(target_csv))
+        tqdm.write("\nsaved %s" % os.path.basename(target_csv))
       else:
         # no valid csv
         tqdm.write("no valid csv chunk for %s" % text_file)
-        import ipdb; ipdb.set_trace()
         continue
 
-    target_image = target_file + ".h5"
+
+    target_image = os.path.join(args['image_outdir'], filename)+".h5"
     if os.path.exists(target_image):
       tqdm.write("%s exists" % os.path.basename(target_image))
 
@@ -186,15 +187,20 @@ def main():
     # store chunk_outside as beginning of next chunk
     relevant_chunks = [chunk_outside]
 
-
-
+    target_label = os.path.join(args['label_outdir'], filename)+".csv"
+    if os.path.exists(target_label):
+      tqdm.write("%s exists" % os.path.basename(target_label))
+    else:
+      greater = label_df[label_df['root_postID'] >= min_pid]
+      sub_label_df = greater[greater['root_postID'] <= max_pid]
+      sub_label_df.to_csv(target_label, header=None, index=False)
+      tqdm.write("saved %s" % os.path.basename(target_label))
   # for csv_file in tqdm(args['csv_files']):
   #   min_pid = int(main_df['root_postID'].min())
   #   max_pid = int(main_df['root_postID'].max())
 
   #   create_corresponding_h5py(csv_file, args['image_outdir'], image_iterator, min_pid, max_pid)
 
-  #   sub_label_df = label_df[label_df['root_postID'] >= min_pid and label_df['root_postID'] <= max_pid]
 
 if __name__ == '__main__':
   main()

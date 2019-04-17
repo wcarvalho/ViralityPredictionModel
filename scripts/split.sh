@@ -33,7 +33,9 @@ align_csv_image_text_label_data(){
   --label-header ${base_path}/label_header.csv 
 }
 
-align_csv_image_text_label_data 'train'
+# align_csv_image_text_label_data 'train'
+align_csv_image_text_label_data 'val'
+# align_csv_image_text_label_data 'test'
 
 # # create a pid_start,pid_end map for the labels
 # create_label_map(){

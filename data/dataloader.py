@@ -11,78 +11,87 @@ from tqdm import tqdm
 import argparse
 import h5py
 
-from data.twitter_chunk import TwitterDatasetChunk, close_h5py_filelist, open_data_files
-from src.utils import get_filenames
+from data.twitter_chunk import TwitterDatasetChunk
+from data.utils import get_overlapping_data_files
 
 
 class TwitterDataloader(object):
   """docstring for TwitterDataloader"""
-  def __init__(self, chunks, key, user_size, text_size, image_size, colnames, label_files, label_map, text_files, image_files, dummy_user_vector=False, shuffle=False, batch_size=1024, num_workers=4):
+  def __init__(self,
+      data_files,
+      image_files,
+      text_files,
+      label_files,
+      key,
+      data_header,
+      label_header,
+      user_size,
+      text_size,
+      image_size,
+      dummy_user_vector=False,
+      shuffle=False,
+      batch_size=1024,
+      num_workers=4):
     super(TwitterDataloader, self).__init__()
 
-    self.chunks = chunks
-    self.colnames = colnames
+    self.data_files=data_files
+    self.image_files=image_files
+    self.text_files=text_files
+    self.label_files=label_files
+    self.zipped_files = [i for i in zip(data_files, image_files, text_files, label_files)]
 
-    self.user_size = user_size
-    self.text_size = text_size
-    self.image_size = image_size
+    self.key=key
+    self.data_header=data_header
+    self.label_header=label_header
 
-    self.label_files = label_files
-    self.label_map = label_map
-    self.text_files = text_files
-    self.image_files = image_files
+    self.user_size=user_size
+    self.text_size=text_size
+    self.image_size=image_size
 
-    self.dummy_user_vector = dummy_user_vector
-    self.shuffle = shuffle
-    self.batch_size = batch_size
-    self.key = key
-    self.num_workers = num_workers
+    self.dummy_user_vector=dummy_user_vector
+    self.shuffle=shuffle
+    self.batch_size=batch_size
+    self.num_workers=num_workers
 
-    self.chunk_indx = 0
+    self.file_indx = 0
     self.overall_indx = 0
-    self.num_chunks = len(self.chunks)
+    self.num_chunks = len(self.data_files)
     self.num_batches_in_chunk = None
 
-    self.twitter_dataset = None
 
-    self.iterator = self.load_iterator(self.chunks[self.chunk_indx])
+    self.iterator = self.load_iterator(self.file_indx)
     self.max_iterator_num_batches = self.num_batches_in_chunk
 
-  def load_iterator(self, chunk):
-    try:
-      self.data_df = pd.read_csv(chunk, sep=",", names=self.colnames, header=None)
-    except Exception as e:
-      print(e)
-      import ipdb; ipdb.set_trace()
-      raise e
-    self.twitter_dataset = TwitterDatasetChunk(
-      df=self.data_df,
+  def load_iterator(self, indx):
+    data_file, image_file, text_file, label_file = self.zipped_files[indx]
+    twitter_dataset = TwitterDatasetChunk(
+      data_file=data_file,
+      image_file=image_file,
+      text_file=text_file,
+      label_file=label_file,
       key=self.key,
-      colnames=self.colnames,
+      data_header=self.data_header,
+      label_header=self.label_header,
       user_size=self.user_size,
       text_size=self.text_size,
       image_size=self.image_size,
-      label_files=self.label_files,
-      label_map=self.label_map,
-      text_files=self.text_files,
-      image_files=self.image_files,
       dummy_user_vector=self.dummy_user_vector
-      )
+    )
 
     self.chunk_batch_indx = 0
-    self.num_batches_in_chunk = len(self.twitter_dataset)//self.batch_size + (len(self.twitter_dataset) % self.batch_size > 0)
+    self.num_batches_in_chunk = len(twitter_dataset)//self.batch_size + (len(twitter_dataset) % self.batch_size > 0)
 
 
-    self.dataloader = DataLoader(self.twitter_dataset, batch_size=self.batch_size,
+    dataloader = DataLoader(twitter_dataset, batch_size=self.batch_size,
                             shuffle=self.shuffle, num_workers=self.num_workers)
 
-    return iter(self.dataloader)
+    return iter(dataloader)
 
   def __len__(self):
     return self.num_chunks*self.max_iterator_num_batches
 
   def __iter__(self):
-    self.chunk_indx = 0
+    self.file_indx = 0
     self.overall_indx = 0
     return self
 
@@ -95,12 +104,12 @@ class TwitterDataloader(object):
       return to_return
     # else, new file:
     except StopIteration as si:
-      self.chunk_indx += 1
+      self.file_indx += 1
 
-      if self.chunk_indx >= self.num_chunks:
+      if self.file_indx >= self.num_chunks:
         raise StopIteration
       else:
-        file=self.chunks[self.chunk_indx]
+        file=self.data_files[self.file_indx]
         tqdm.write("%s finished" % file)
         self.iterator = self.load_iterator(file)
         return next(self.iterator)
@@ -180,55 +189,53 @@ def main():
   args, unknown = parser.parse_known_args()
   args = vars(args)
 
-  args_to_print = {name:args[name] for name in args if not "filenames" in name}
+  args_to_print = {name:args[name] for name in args if not "files" in name}
   pprint(args_to_print)
   pprint(unknown)
 
-  if args['split_map'] and args['master_filenames']:
-    with open(args['split_map'], 'r') as f:
-      split_map = yaml.load(f, Loader=yaml.FullLoader)
-      split_map = {name: set(split_map[name]) for name in split_map}
+  if args['data_header']:
+    with open(args['data_header']) as f:
+      data_header = f.readlines()[0].strip().split(",")
+  if args['label_header']:
+    with open(args['label_header']) as f:
+      label_header = f.readlines()[0].strip().split(",")
 
-      train_files = [f for f in args['master_filenames'] if os.path.basename(f) in split_map['train']]
-      valid_files = [f for f in args['master_filenames'] if os.path.basename(f) in split_map['valid']]
-      test_files = [f for f in args['master_filenames'] if os.path.basename(f) in split_map['test']]
-  elif args['master_filenames'] and not args['split_map']:
-    raise RuntimeError("need map to split master-filenames into train/valid/test")
-  else:
-    train_files = args['train_filenames']
-    valid_files = args['valid_filenames']
-    test_files = args['test_filenames']
+  train_data_files=args['train_data_files']
+  train_image_files=args['train_image_files']
+  train_text_files=args['train_text_files']
+  train_label_files=args['train_label_files']
+  key = args['key']
 
-  text_files = []
-  image_files = []
-  label_files = []
-  text_files, image_files, label_files = open_data_files(args['text_filenames'], args['image_filenames'], args['label_filenames'])
+  user_size = args['user_size']
+  text_size = args['text_size']
+  image_size = args['image_size']
+  dummy_user_vector = args['dummy_user_vector']
+  shuffle = args['shuffle']
+  batch_size = args['batch_size']
+  num_workers = args['num_workers']
 
-  colnames, label_map, train_dataloader, _, _ = load_train_valid_test_loaders(
-      train_files=train_files,
-      valid_files=valid_files,
-      test_files=test_files,
-      header_file=args['header'],
-      label_map_file=args['label_map'],
-      label_files = label_files,
-      text_files = text_files,
-      image_files = image_files,
-      key=args['key'],
-      user_size=args['user_size'],
-      text_size=args['text_size'],
-      image_size=args['image_size'],
-      dummy_user_vector=args['dummy_user_vector'],
-      shuffle=args['shuffle'],
-      batch_size=args['batch_size'],
-      num_workers=args['num_workers']
-      )
+  train_data_files, train_image_files, train_text_files, train_label_files = get_overlapping_data_files(train_data_files, train_image_files, train_text_files, train_label_files)
 
-  for batch in tqdm(train_dataloader): pass
+  data_loader = TwitterDataloader(
+    data_files=train_data_files,
+    image_files=train_image_files,
+    text_files=train_text_files,
+    label_files=train_label_files,
+    key=key,
+    data_header=data_header,
+    label_header=label_header,
+    user_size=user_size,
+    text_size=text_size,
+    image_size=image_size,
+    dummy_user_vector=dummy_user_vector,
+    shuffle=shuffle,
+    batch_size=batch_size,
+    num_workers=num_workers,
+  )
+
+  for batch in tqdm(data_loader): pass
   print("Finished going through all files...")
 
 if __name__ == '__main__':
   main()
-  # close_h5py_filelist([f for f in train_files])
-  # close_h5py_filelist([f for f in valid_files])
-  # close_h5py_filelist([f for f in test_files])
 

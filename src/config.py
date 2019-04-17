@@ -6,25 +6,41 @@ def load_parser():
 
 
   logging = parser.add_argument_group("logging settings")
-  logging.add_argument('-ld', '--log-dir', type=str, default='logs/feature_model/tb')
-  logging.add_argument('-ckpt', '--checkpoint', type=str, default='logs/feature_model/ckpt.th')
+  logging.add_argument('-ld', '--log-dir', type=str, default=None)
+  logging.add_argument('-ckpt', '--checkpoint', type=str, default=None)
   logging.add_argument('-v', '--verbosity', type=int, default=0, help='1=important prints. 2=detailed prints.')
+  logging.add_argument('-sf', '--save-frequency', type=int, default=200, help='save every k batches. useful for big data')
 
 
   file = parser.add_argument_group("file settings")
-  file.add_argument('-mf', '--master-filenames', type=str, nargs='+', default=[])
-  file.add_argument('--train-filenames', type=str, nargs='+', default=[])
-  file.add_argument('--valid-filenames', type=str, nargs='+', default=[])
-  file.add_argument('--test-filenames', type=str, nargs='+', default=[])
-  file.add_argument('-lf', '--label-filenames', type=str, nargs='+', default=[])
-  file.add_argument('-lm', '--label-map', type=str, default=None, help='dict with start,end pids of label chunks')
-  file.add_argument('-s,', '--split-map', type=str, default=None, help='dictionary with train/valid/test splits for --master-filenames. or you can use train/valid/test-filenames')
-  file.add_argument('-if', '--image-filenames', type=str, nargs='+', default=[])
-  file.add_argument('-tf', '--text-filenames', type=str, nargs='+', default=[])
+  # file.add_argument('-mf', '--master-filenames', type=str, nargs='+', default=[])
+
+  file.add_argument('--train-data-files', type=str, nargs='+', default=[])
+  file.add_argument('--train-image-files', type=str, nargs='+', default=[])
+  file.add_argument('--train-text-files', type=str, nargs='+', default=[])
+  file.add_argument('--train-label-files', type=str, nargs='+', default=[])
+
+  file.add_argument('--valid-data-files', type=str, nargs='+', default=[])
+  file.add_argument('--valid-image-files', type=str, nargs='+', default=[])
+  file.add_argument('--valid-text-files', type=str, nargs='+', default=[])
+  file.add_argument('--valid-label-files', type=str, nargs='+', default=[])
+
+  file.add_argument('--test-data-files', type=str, nargs='+', default=[])
+  file.add_argument('--test-image-files', type=str, nargs='+', default=[])
+  file.add_argument('--test-text-files', type=str, nargs='+', default=[])
+  file.add_argument('--test-label-files', type=str, nargs='+', default=[])
+
+  # file.add_argument('-lf', '--label-filenames', type=str, nargs='+', default=[])
+  # file.add_argument('-lm', '--label-map', type=str, default=None, help='dict with start,end pids of label chunks')
+  # file.add_argument('-s,', '--split-map', type=str, default=None, help='dictionary with train/valid/test splits for --master-filenames. or you can use train/valid/test-filenames')
+  # file.add_argument('-if', '--image-filenames', type=str, nargs='+', default=[])
+  # file.add_argument('-tf', '--text-filenames', type=str, nargs='+', default=[])
   file.add_argument('-k', '--key', type=str, default="root_postID")
-  file.add_argument('-he', '--header', type=str, default=None)
-  file.add_argument('--max-label-files-open', type=int, default=2)
-  file.add_argument('--max-hfpy-files-open', type=int, default=2)
+  file.add_argument('--data-header', type=str, default=None)
+  file.add_argument('--label-header', type=str, default=None)
+
+  # file.add_argument('--max-label-files-open', type=int, default=2)
+  # file.add_argument('--max-hfpy-files-open', type=int, default=2)
 
 
 

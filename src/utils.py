@@ -26,11 +26,6 @@ class AverageMeter(object):
     else:
       return 0
 
-def get_filenames(files, keep_suffix=False):
-  names = [os.path.basename(fname) for fname in files]
-  if keep_suffix: return names
-  return [os.path.splitext(n)[0] for n in names]
-
 def tensor_is_set(tensor):
   try:
     tensor[0]
