@@ -159,7 +159,7 @@ class Trainer(object):
   def write_meters_to_tensorboard(self, name, step):
     for meter in self.meters:
       self.writer.add_scalar("%s/%s" % (name, meter), self.meters[meter].average, step)
-    tqdm.write("wrote to tensorboardX for %s" % name)
+    # tqdm.write("wrote to tensorboardX for %s" % name)
 
   def train(self, train_data_files, train_image_files, train_text_files, train_label_files, valid_data_files, valid_image_files, valid_text_files, valid_label_files):
 
