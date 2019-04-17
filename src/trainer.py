@@ -151,6 +151,16 @@ class Trainer(object):
 
     if log_dir:
       path_exists(log_dir)
+
+      logs = sorted(glob.glob("%s.*" % log_dir))
+      if logs:
+        file, suffix = os.path.splitext(logs[-1])
+        number = int(suffix[1:])
+        log_dir += ".%.5d" % (number+1)
+      else:
+        log_dir += ".%.5d" % 1
+      path_exists(log_dir)
+
       self.writer = SummaryWriter(log_dir)
       print("logging to %s" % log_dir)
     else:
@@ -207,7 +217,7 @@ class Trainer(object):
         note = "patience increased to %d" % self.patience_used
 
 
-      if epoch % 10 == 1:
+      if epoch % 5 == 1:
         if self.checkpoint_file: self.save_to_ckpt(self.checkpoint_file, iteration=True)
       # if self.patience_used >= self.patience:
         # print("patience exceeded. training finished")
@@ -266,7 +276,11 @@ class Trainer(object):
           # if self.iteration % self.save_frequency == 1 and backprop:
             # if self.checkpoint_file: self.save_to_ckpt(self.checkpoint_file, self.iteration)
           if backprop:
-            if self.writer: self.write_meters_to_tensorboard(self.batch_meters, "batch-wise", self.iteration)
+            if self.writer: 
+              self.write_meters_to_tensorboard(self.batch_meters, "batch-wise", self.iteration)
+              # uncomment line below to store individual batch loss.
+              # if commented, stores average over __long__ horizon
+              # for meter in self.batch_meters: self.batch_meters[meter].reset()
 
 
         # ----- Set pbar/tqdm description --- 
@@ -384,14 +398,15 @@ class Trainer(object):
       best_epoch_checkpoint_file = best_epoch_checkpoints[-1]
 
       # pick the latest of the two
-      if os.path.getctime(best_epoch_checkpoints) >= os.path.getctime(iter_checkpoint_file):
+      if os.path.getctime(best_epoch_checkpoint_file) >= os.path.getctime(iter_checkpoint_file):
         checkpoint_file = best_epoch_checkpoints
       else:
         checkpoint_file = iter_checkpoint_file
 
 
+
     checkpoint = torch.load(checkpoint_file)
-    self.start_epoch = self.min_epoch = checkpoint['epoch'] + 1 if checkpoint_file == best_epoch_checkpoints else checkpoint['epoch']
+    self.start_epoch = self.min_epoch = checkpoint['epoch'] + 1
     self.min_valid = checkpoint['min_valid']
     self.patience_used = checkpoint['patience_used']
     self.iteration = checkpoint['iteration']
