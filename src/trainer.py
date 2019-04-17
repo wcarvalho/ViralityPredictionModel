@@ -231,17 +231,17 @@ class Trainer(object):
         shuffle=self.shuffle, num_workers=self.num_workers)
 
       for batch_indx, batch in enumerate(dataloader):
-        if total_batch_indx == 0:
+        if batch_indx == 0:
           # initalize things at first batch
-          batch_0 = batch
-          batch_1 = batch_0
+          # batch_0 = batch
+          batch_1 = batch
         else:
-          if total_batch_indx < self.start_batch_indx:
-            pass
-            # total_batch_indx += 1
-            # continue
-          else:
-            self.start_batch_indx = total_batch_indx
+          # if total_batch_indx < self.start_batch_indx:
+          #   pass
+          #   # total_batch_indx += 1
+          #   # continue
+          # else:
+          #   self.start_batch_indx = total_batch_indx
           # otherwise act regularly
           batch_2 = batch
           if self.verbosity > 1: tqdm.write("\n------------\noutside: batch loaded")
@@ -396,7 +396,7 @@ class Trainer(object):
 
     file, suffix=os.path.splitext(checkpoint_file)
     if iteration:
-      checkpoint_file = "%s_iter_%.5d%s" % (file, iteration, suffix)
+      checkpoint_file = "%s_iter_%.9d%s" % (file, iteration, suffix)
 
     if epoch:
       checkpoint_file = "%s_epoch_%.5d_BEST_%s" % (file, min_epoch, suffix)

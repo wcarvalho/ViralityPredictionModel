@@ -122,6 +122,7 @@ class TwitterDatasetChunk(Dataset):
 
 
   def __del__(self):
+    print("closing %s and friends" % self.data_file)
     self.close()
 
   def close(self):

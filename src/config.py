@@ -45,7 +45,7 @@ def load_parser():
 
 
   training = parser.add_argument_group("training settings")
-  training.add_argument('-bs', '--batch-size', type=int, default=256)
+  training.add_argument('-bs', '--batch-size', type=int, default=128)
   training.add_argument('-s', '--seed', type=int, default=1)
   training.add_argument('-e', '--epochs', type=int, default=1000)
   training.add_argument('--macro-lambda', type=int, default=1)
