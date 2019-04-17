@@ -140,6 +140,7 @@ class Trainer(object):
     np.random.seed(seed)
 
     self.meters = {meter: AverageMeter() for meter in ['negative_sampling_loss', 'rc_loss', 'rp_loss', 'pc_loss', 'tree_size_loss', 'max_depth_loss', 'avg_depth_loss', 'target_loss', 'total_loss']}
+    self.batch_meters = {meter: AverageMeter() for meter in ['negative_sampling_loss', 'rc_loss', 'rp_loss', 'pc_loss', 'tree_size_loss', 'max_depth_loss', 'avg_depth_loss', 'target_loss', 'total_loss']}
 
     self.checkpoint_file = checkpoint_file
     if checkpoint_file:
@@ -155,10 +156,9 @@ class Trainer(object):
     else:
       self.writer = None
 
-
-  def write_meters_to_tensorboard(self, name, step):
-    for meter in self.meters:
-      self.writer.add_scalar("%s/%s" % (name, meter), self.meters[meter].average, step)
+  def write_meters_to_tensorboard(self, meters, name, step):
+    for meter in meters:
+      self.writer.add_scalar("%s/%s" % (name, meter), meters[meter].average, step)
     # tqdm.write("wrote to tensorboardX for %s" % name)
 
   def train(self, train_data_files, train_image_files, train_text_files, train_label_files, valid_data_files, valid_image_files, valid_text_files, valid_label_files):
@@ -179,7 +179,7 @@ class Trainer(object):
       torch.cuda.empty_cache()
       train_loss = self.train_epoch([train_data_files[epoch % ntrain_files]], [train_image_files[epoch % ntrain_files]], [train_text_files[epoch % ntrain_files]], [train_label_files[epoch % ntrain_files]], backprop=True)
       if self.writer:
-        self.write_meters_to_tensorboard("train", epoch)
+        self.write_meters_to_tensorboard(self.meters, "train", epoch)
       for meter in self.meters: self.meters[meter].reset()
 
 
@@ -189,7 +189,7 @@ class Trainer(object):
       with torch.no_grad():
         valid_loss = self.train_epoch([valid_data_files[epoch % nvalid_files]], [valid_image_files[epoch % nvalid_files]], [valid_text_files[epoch % nvalid_files]], [valid_label_files[epoch % nvalid_files]], backprop=False)
       if self.writer:
-        self.write_meters_to_tensorboard("valid", epoch)
+        self.write_meters_to_tensorboard(self.meters, "valid", epoch)
       for meter in self.meters: self.meters[meter].reset()
 
 
@@ -207,6 +207,8 @@ class Trainer(object):
         note = "patience increased to %d" % self.patience_used
 
 
+      if epoch % 10 == 1:
+        if self.checkpoint_file: self.save_to_ckpt(self.checkpoint_file, iteration=True)
       # if self.patience_used >= self.patience:
         # print("patience exceeded. training finished")
         # break
@@ -263,7 +265,8 @@ class Trainer(object):
 
           # if self.iteration % self.save_frequency == 1 and backprop:
             # if self.checkpoint_file: self.save_to_ckpt(self.checkpoint_file, self.iteration)
-          if self.writer: self.write_meters_to_tensorboard("batch-wise", self.iteration)
+          if backprop:
+            if self.writer: self.write_meters_to_tensorboard(self.batch_meters, "batch-wise", self.iteration)
 
 
         # ----- Set pbar/tqdm description --- 
@@ -347,18 +350,22 @@ class Trainer(object):
 
     # ---- Record Losses ---
     batch_len = r_vector.shape[0]
-    self.meters['negative_sampling_loss'].update(p_follow_loss.item(), batch_len)
-    self.meters['rc_loss'].update(rc_loss.item(), batch_len)
-    self.meters['rp_loss'].update(rp_loss.item(), batch_len)
-    self.meters['pc_loss'].update(pc_loss.item(), batch_len)
-    self.meters['tree_size_loss'].update(tree_size_loss.item(), batch_len)
-    self.meters['max_depth_loss'].update(max_depth_loss.item(), batch_len)
-    self.meters['avg_depth_loss'].update(avg_depth_loss.item(), batch_len)
-    self.meters['target_loss'].update(target_loss.item(), batch_len)
-    self.meters['total_loss'].update(total_loss.item(), batch_len)
+    self.record_losses(self.meters, batch_len, p_follow_loss, rc_loss,rp_loss, pc_loss, tree_size_loss, max_depth_loss, avg_depth_loss, target_loss, total_loss)
+    self.record_losses(self.batch_meters, batch_len, p_follow_loss, rc_loss,rp_loss, pc_loss, tree_size_loss, max_depth_loss, avg_depth_loss, target_loss, total_loss)
 
     if self.verbosity > 1: tqdm.write("\trecord losses ")
     return total_loss
+
+  def record_losses(self, meters, batch_len, p_follow_loss, rc_loss,rp_loss, pc_loss, tree_size_loss, max_depth_loss, avg_depth_loss, target_loss, total_loss):
+    meters['negative_sampling_loss'].update(p_follow_loss.item(), batch_len)
+    meters['rc_loss'].update(rc_loss.item(), batch_len)
+    meters['rp_loss'].update(rp_loss.item(), batch_len)
+    meters['pc_loss'].update(pc_loss.item(), batch_len)
+    meters['tree_size_loss'].update(tree_size_loss.item(), batch_len)
+    meters['max_depth_loss'].update(max_depth_loss.item(), batch_len)
+    meters['avg_depth_loss'].update(avg_depth_loss.item(), batch_len)
+    meters['target_loss'].update(target_loss.item(), batch_len)
+    meters['total_loss'].update(total_loss.item(), batch_len)
 
   def load_from_ckpt(self, checkpoint_file):
     file, suffix=os.path.splitext(checkpoint_file)
