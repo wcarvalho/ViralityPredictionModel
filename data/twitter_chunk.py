@@ -152,34 +152,37 @@ def main():
     with open(args['label_header']) as f:
       label_header = f.readlines()[0].strip().split(",")
 
-  data_file = args['train_data_files'][6]
-  image_file = args['train_image_files'][6]
-  text_file = args['train_text_files'][6]
-  label_file = args['train_label_files'][6]
+  data_files = args['valid_data_files']
+  image_files = args['valid_image_files']
+  text_files = args['valid_text_files']
+  label_files = args['valid_label_files']
   key = args['key']
   user_size = args['user_size']
   text_size = args['text_size']
   image_size = args['image_size']
   dummy_user_vector = args['dummy_user_vector']
 
-  dataset = TwitterDatasetChunk(
-    data_file=data_file,
-    image_file=image_file,
-    text_file=text_file,
-    label_file=label_file,
-    key=key,
-    data_header=data_header,
-    label_header=label_header,
-    user_size=user_size,
-    text_size=text_size,
-    image_size=image_size,
-    dummy_user_vector=dummy_user_vector
-    )
+  for data_file, image_file, text_file, label_file in tqdm(zip(data_files, image_files, text_files, label_files)):
+    dataset = TwitterDatasetChunk(
+      data_file=data_file,
+      image_file=image_file,
+      text_file=text_file,
+      label_file=label_file,
+      key=key,
+      data_header=data_header,
+      label_header=label_header,
+      user_size=user_size,
+      text_size=text_size,
+      image_size=image_size,
+      dummy_user_vector=dummy_user_vector
+      )
+    if not len(dataset):
+      import ipdb; ipdb.set_trace()
 
-  dataloader = DataLoader(dataset, batch_size=args['batch_size'],
-                            shuffle=args['shuffle'], num_workers=args['num_workers'])
+  # dataloader = DataLoader(dataset, batch_size=args['batch_size'],
+  #                           shuffle=args['shuffle'], num_workers=args['num_workers'])
 
-  for batch in tqdm(dataloader): pass
+  # for batch in tqdm(dataloader): pass
 
 if __name__ == '__main__':
   main()

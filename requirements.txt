@@ -5,6 +5,4 @@ tqdm
 ipdb
 pyyaml
 tensorboardX
-tensorboard
-tensorflow
 pandas

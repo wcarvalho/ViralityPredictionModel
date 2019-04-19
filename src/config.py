@@ -49,7 +49,7 @@ def load_parser():
   training.add_argument('-s', '--seed', type=int, default=1)
   training.add_argument('-e', '--epochs', type=int, default=10000)
   training.add_argument('--macro-lambda', type=int, default=1)
-  training.add_argument('--micro-lambda', type=int, default=1)
+  training.add_argument('--micro-lambda', type=int, default=.001)
   training.add_argument('--num-workers', type=int, default=6)
   training.add_argument('-lr', '--learning-rate', type=float, default=1e-3)
   training.add_argument('--no-cuda', action='store_true', default=False)

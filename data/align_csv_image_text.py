@@ -157,22 +157,21 @@ def main():
         break
 
     filename = os.path.splitext(os.path.basename(text_file))[0]
-
+    if relevant_chunks: main_df_chunk = pd.concat(relevant_chunks)
 
     target_csv = os.path.join(args['data_outdir'], filename)+".csv"
     if os.path.exists(target_csv):
       tqdm.write("\n%s exists" % os.path.basename(target_csv))
+    elif relevant_chunks and not main_df_chunk.empty:
+      # you have a valid csv
+      # create df from those and write it to the path using the same filename
+
+      main_df_chunk.to_csv(target_csv, header=None, index=False)
+      tqdm.write("\nsaved %s" % os.path.basename(target_csv))
     else:
-      if relevant_chunks:
-        # you have a valid csv
-        # create df from those and write it to the path using the same filename
-        main_df_chunk = pd.concat(relevant_chunks)
-        main_df_chunk.to_csv(target_csv, header=None, index=False)
-        tqdm.write("\nsaved %s" % os.path.basename(target_csv))
-      else:
-        # no valid csv
-        tqdm.write("no valid csv chunk for %s" % text_file)
-        continue
+      # no valid csv
+      tqdm.write("no valid csv chunk for %s" % text_file)
+      continue
 
 
     target_image = os.path.join(args['image_outdir'], filename)+".h5"

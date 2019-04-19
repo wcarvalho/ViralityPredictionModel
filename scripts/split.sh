@@ -27,7 +27,7 @@ align_csv_image_text_label_data(){
   --image-files /data/wcarvalh/twitter/features_from_yunseok/image/* \
   --label-file ${base_path}/label_sorted.csv \
   --image-outdir ${base_path}/aligned_chunks/image/${1} \
-  --data-outdir ${base_path}/aligned_chunks/data/${1} \
+  --data-outdir ${base_path}/aligned_chunks2/data/${1} \
   --label-outdir ${base_path}/aligned_chunks/label/${1}\
   --csv-header ${base_path}/header.csv\
   --label-header ${base_path}/label_header.csv 

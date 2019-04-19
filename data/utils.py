@@ -7,7 +7,6 @@ def get_overlapping_data_files(data_files, image_files, text_files, label_files)
   label_filenames = set(get_filenames(label_files))
   intersection = data_filenames.intersection(*[f for f in [image_filenames, text_filenames, label_filenames] if f])
   if not len(intersection) == len(data_files):
-    import ipdb; ipdb.set_trace()
     data_files = [f for f in data_files if get_filename(f) in intersection]
     image_files = [f for f in image_files if get_filename(f) in intersection]
     text_files = [f for f in text_files if get_filename(f) in intersection]

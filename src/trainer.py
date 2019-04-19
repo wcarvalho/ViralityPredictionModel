@@ -133,14 +133,18 @@ class Trainer(object):
     self.patience = 100
     self.patience_used = 0
     self.iteration = 0
-    self.train_losses = []
-    self.valid_losses = []
 
     torch.manual_seed(seed)
     np.random.seed(seed)
 
-    self.meters = {meter: AverageMeter() for meter in ['negative_sampling_loss', 'rc_loss', 'rp_loss', 'pc_loss', 'tree_size_loss', 'max_depth_loss', 'avg_depth_loss', 'target_loss', 'total_loss']}
-    self.batch_meters = {meter: AverageMeter() for meter in ['negative_sampling_loss', 'rc_loss', 'rp_loss', 'pc_loss', 'tree_size_loss', 'max_depth_loss', 'avg_depth_loss', 'target_loss', 'total_loss']}
+    self.meter_names = ['negative_sampling_loss', 'rc_loss', 'rp_loss', 'pc_loss', 'tree_size_loss', 'max_depth_loss', 'avg_depth_loss', 'target_loss', 'total_loss']
+    self.name2indx = {name:indx for indx,name in enumerate(self.meter_names)}
+
+    self.meters = {meter: AverageMeter() for meter in self.meter_names}
+    self.batch_meters = {meter: AverageMeter() for meter in self.meter_names}
+
+    self.train_losses = torch.zeros(len(self.meter_names), self.max_epoch)
+    self.valid_losses = torch.zeros(len(self.meter_names), self.max_epoch)
 
     self.checkpoint_file = checkpoint_file
     if checkpoint_file:
@@ -173,8 +177,9 @@ class Trainer(object):
 
   def train(self, train_data_files, train_image_files, train_text_files, train_label_files, valid_data_files, valid_image_files, valid_text_files, valid_label_files):
 
-    train_loss = self.train_losses[-1] if self.train_losses else 0
-    valid_loss = self.valid_losses[-1] if self.valid_losses else 0
+    train_loss = self.train_losses[self.name2indx['total_loss']][self.start_epoch]
+    valid_loss = self.valid_losses[self.name2indx['total_loss']][self.start_epoch]
+
     pbar = tqdm(range(self.start_epoch, self.max_epoch))
 
     pbar.set_description("Epoch %d. Train loss=%.2f, Valid loss = %.2f" % (self.start_epoch, train_loss, valid_loss))
@@ -183,11 +188,16 @@ class Trainer(object):
     nvalid_files = len(valid_data_files)
 
     for epoch in pbar:
+      self.current_epoch = epoch
       note = ""
       self.model.train()
       self.model.zero_grad()
       torch.cuda.empty_cache()
       train_loss = self.train_epoch([train_data_files[epoch % ntrain_files]], [train_image_files[epoch % ntrain_files]], [train_text_files[epoch % ntrain_files]], [train_label_files[epoch % ntrain_files]], backprop=True)
+
+      for indx, name in enumerate(self.meter_names):
+        self.train_losses[indx][epoch] = self.meters[name].average
+
       if self.writer:
         self.write_meters_to_tensorboard(self.meters, "train", epoch)
       for meter in self.meters: self.meters[meter].reset()
@@ -198,13 +208,13 @@ class Trainer(object):
       torch.cuda.empty_cache()
       with torch.no_grad():
         valid_loss = self.train_epoch([valid_data_files[epoch % nvalid_files]], [valid_image_files[epoch % nvalid_files]], [valid_text_files[epoch % nvalid_files]], [valid_label_files[epoch % nvalid_files]], backprop=False)
+      for indx, name in enumerate(self.meter_names):
+        self.valid_losses[indx][epoch] = self.meters[name].average
+
       if self.writer:
         self.write_meters_to_tensorboard(self.meters, "valid", epoch)
       for meter in self.meters: self.meters[meter].reset()
 
-
-      self.train_losses.append(train_loss)
-      self.valid_losses.append(valid_loss)
 
       if valid_loss < self.min_valid:
         self.min_valid = valid_loss
@@ -246,6 +256,9 @@ class Trainer(object):
         image_size=self.image_size,
         dummy_user_vector=self.dummy_user_vector
         )
+      if not len(dataset.data):
+        # empty dataset for some reason? continue
+        continue
       dataloader = DataLoader(dataset, batch_size=self.batch_size,
         shuffle=self.shuffle, num_workers=self.num_workers)
 
@@ -280,7 +293,7 @@ class Trainer(object):
               self.write_meters_to_tensorboard(self.batch_meters, "batch-wise", self.iteration)
               # uncomment line below to store individual batch loss.
               # if commented, stores average over __long__ horizon
-              # for meter in self.batch_meters: self.batch_meters[meter].reset()
+              for meter in self.batch_meters: self.batch_meters[meter].reset()
 
 
         # ----- Set pbar/tqdm description --- 
@@ -292,9 +305,13 @@ class Trainer(object):
           ))
         total_batch_indx += 1
 
+
       dataset.close()
     # for last instance, use batch 0 as the "random" batch
     # epoch_loss += self.train_instance(train_batch=batch_2, random_batch=batch_0)
+
+    if not total_batch_indx:
+      return 0
     return epoch_loss/total_batch_indx
 
   def train_instance(self, train_batch, random_batch, backprop=False):
@@ -399,14 +416,15 @@ class Trainer(object):
 
       # pick the latest of the two
       if os.path.getctime(best_epoch_checkpoint_file) >= os.path.getctime(iter_checkpoint_file):
-        checkpoint_file = best_epoch_checkpoints
+        checkpoint_file = best_epoch_checkpoint_file
       else:
         checkpoint_file = iter_checkpoint_file
 
 
-
     checkpoint = torch.load(checkpoint_file)
-    self.start_epoch = self.min_epoch = checkpoint['epoch'] + 1
+
+    self.start_epoch = checkpoint['current_epoch'] + 1
+    self.min_epoch = checkpoint['min_epoch']
     self.min_valid = checkpoint['min_valid']
     self.patience_used = checkpoint['patience_used']
     self.iteration = checkpoint['iteration']
@@ -416,25 +434,27 @@ class Trainer(object):
     self.model.load_state_dict(checkpoint['model'])
     self.optimizer.load_state_dict(checkpoint['optimizer'])
 
-    for name in self.meters:
-      self.meters[name].update(checkpoint[name], checkpoint["count"])
+    # for name in self.meters:
+    #   self.meters[name].update(checkpoint[name], checkpoint["count"])
 
     torch.manual_seed(checkpoint['seed'])
     np.random.seed(checkpoint['seed'])
 
-  def save_to_ckpt(self, checkpoint_file, iteration=None, epoch=False):
+  def save_to_ckpt(self, checkpoint_file, iteration=None, epoch=None):
 
     file, suffix=os.path.splitext(checkpoint_file)
     if iteration:
       checkpoint_file = "%s_iter_%.9d%s" % (file, iteration, suffix)
 
     if epoch:
-      checkpoint_file = "%s_epoch_%.5d_BEST%s" % (file, self.min_epoch, suffix)
+      checkpoint_file = "%s_epoch_%.5d_BEST%s" % (file, epoch, suffix)
 
-    to_save = {name: self.meters[name].average for name in self.meters}
-    to_save['count'] = next(iter(self.meters.items()))[1].count
+    # to_save = {name: self.meters[name].average for name in self.meters}
+    # to_save['count'] = next(iter(self.meters.items()))[1].count
+    to_save = {}
     to_save.update({
-            'epoch': self.min_epoch,
+            'min_epoch': self.min_epoch,
+            'current_epoch': self.current_epoch,
             'min_valid': self.min_valid,
             'model': self.model.state_dict(),
             'optimizer': self.optimizer.state_dict(),
@@ -444,6 +464,7 @@ class Trainer(object):
             'patience_used' : self.patience_used,
             'train_losses': self.train_losses,
             'valid_losses': self.valid_losses,
+            'loss_names': self.meter_names,
           })
     torch.save(to_save, checkpoint_file)
     print("Saving %s" % checkpoint_file)
