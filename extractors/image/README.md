@@ -25,5 +25,5 @@ I run the video/image downloader with 16 cores
 
 ## Steps
 image_filter -> image_downloader -> image_index_reordering -> image_preprocess -> image_save
-             -> video_downloader -> ...
+( -> video_downloader -> ...)
 
