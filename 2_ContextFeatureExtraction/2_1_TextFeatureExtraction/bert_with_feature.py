@@ -29,8 +29,8 @@ def main(argv):
         START_FROM = 0
 
 
-    base_folder = '../../dataset/feature_text_segment{}'.format(SPLIT_NO)
-    output_folder = '../../dataset/bert_text_output{}'.format(SPLIT_NO)
+    base_folder = './dataset/feature_text_segment{}'.format(SPLIT_NO)
+    output_folder = './dataset/bert_text_output{}'.format(SPLIT_NO)
     os.makedirs(output_folder)
     list_of_items = glob.glob(base_folder+'/*.pickle')
     num_feature_inputs = len(list_of_items)
