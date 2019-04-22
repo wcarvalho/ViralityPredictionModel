@@ -14,7 +14,7 @@ pip install --upgrade youtube-dl
 ```
 
 ## Dataset Folder setting
-../../dataset (root folder)
+./dataset (root folder)
 ./resources (current folder)
 
 
@@ -24,6 +24,6 @@ So, for downloading video, I need to create a subfolder to execute it.
 I run the video/image downloader with 16 cores
 
 ## Steps
-image_filter -> image_downloader -> image_index_reordering -> image_preprocess -> image_save
-( -> video_downloader -> ...)
+image_filter -> image_downloader -> image_preprocess -> image_resnet
+( -> video_downloader -> ... after image_filter)
 

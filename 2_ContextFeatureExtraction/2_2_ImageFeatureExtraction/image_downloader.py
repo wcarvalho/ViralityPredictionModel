@@ -14,19 +14,22 @@ import shutil
 #TOTAL_VID = 2935479
 #TOTAL_IMG = 10837498
 IMAGE_EXT = ['png', 'jpg']
-CACHE_DIR = '/data/yunseokj/mining/image_cache/'
+CACHE_DIR = './dataset/image_cache/'
 IMAGE_TEMPLATE = 'wget --quiet -O {} {}'
+SPLIT_SIZE = 677500
+
 
 def main(argv):
-    if len(argv) != 3:
-        print('wrong command. It should be python bery.py FROM_LINE NUM_LINE')
+    if len(argv) != 2:
+        print('wrong command. It should be python iamge_downloader.py split_no')
         return
 
-    FROM_LINE = int(argv[1])
-    TO_LINE = int(argv[2])
+    bucket_no = int(argv[1])
+    FROM_LINE = SPLIT_SIZE * bucket_no
+    TO_LINE = SPLIT_SIZE * (bucket_no + 1)
 
     key_link_dict = {}
-    with open('../../dataset/orig_image_link.csv') as f:
+    with open('./dataset/orig_image_link.csv') as f:
         reader = csv.reader(f, delimiter=',')
         for idx, target in enumerate(reader):
             if (idx >= TO_LINE) or (idx < FROM_LINE):

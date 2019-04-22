@@ -13,20 +13,9 @@ IMAGE_EXT = ['png', 'jpg']
 VIDEO_EXT = ['mp4', 'mpd', 'gif', 'm3u8']
 
 def main(argv):
-    #if len(argv) not in [2,3]:
-    #    print('wrong command. It should be python bery.py SPLIT_NO [BATCH_SIZE]')
-    #    return
-
-    #SPLIT_NO = int(argv[1])
-    #if len(argv) == 3:
-    #    BATCH_SIZE = int(argv[2])
-    #else:
-    #    BATCH_SIZE = 256
-
-
     new_csv_img = []
     new_csv_vid = []
-    with open('../../dataset/orig_link.csv') as f:
+    with open('./dataset/orig_link.csv') as f:
         reader = csv.reader(f, delimiter=',')
         for target in reader:
             key = int(target[0])
@@ -49,12 +38,12 @@ def main(argv):
                 # take the first image as main
                 new_csv_img.append([key, 'image', img_list[0]])
 
-    with open('../../dataset/orig_video_link.csv', 'w') as f:
+    with open('./dataset/orig_video_link.csv', 'w') as f:
         writer = csv.writer(f, delimiter=',')
         for line in new_csv_vid:
             writer.writerow(line)
 
-    with open('../../dataset/orig_image_link.csv', 'w') as f:
+    with open('./dataset/orig_image_link.csv', 'w') as f:
         writer = csv.writer(f, delimiter=',')
         for line in new_csv_img:
             writer.writerow(line)

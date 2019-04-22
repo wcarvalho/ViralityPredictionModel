@@ -5,6 +5,7 @@ import torch
 import sys
 import os
 import glob
+import operator
 import numpy as np
 import pickle
 from tqdm import trange, tqdm
@@ -18,19 +19,26 @@ import h5py
 
 BATCH_SIZE = 512
 BUCKET_SIZE = 512 * 100
-#TARGET_PATH ='/mnt/brain4/datasets/Twitter/final/image'
-TARGET_PATH = '/data/yunseokj/mining/image_feature_output'
+TARGET_PATH = './dataset/image_feature_output'
 SPLIT_SIZE = 677500
-SORTED_PATH = '/data/yunseokj/mining/image_sorted'
+SORTED_PATH = './dataset/image_sorted'
 
 def main(argv):
     if len(argv) != 2:
-        print('wrong python image_index_reordering new_bucket_no')
+        print('wrong python image_resnet.py new_bucket_no')
     bucket_no = int(argv[1])
-    bucket_folder = os.path.join(SORTED_PATH, '{}_{}'.format(SPLIT_SIZE * bucket_no, SPLIT_SIZE * (bucket_no + 1)))
+    FROM_LINE = SPLIT_SIZE * bucket_no
+    TO_LINE = SPLIT_SIZE * (bucket_no + 1)
+    bucket_folder = os.path.join(SORTED_PATH, '{}_{}'.format(FROM_LINE, TO_LINE))
+    file_list = glob.glob(os.path.join(bucket_folder, '*.npy'))
 
-    with open('/data/yunseokj/mining/orig_image{}.pickle'.format(bucket_no), 'rb') as f:
-        file_list = pickle.load(f)
+    temp_key_list = []
+    for each in file_list:
+        key_with_ext = os.path.basename(each)
+        key, _ = os.path.splitext(key_with_ext)
+        temp_key_list.append(int(key))
+    file_list.clear()
+    file_key_list = sorted(temp_key_list)
 
     if not os.path.exists(TARGET_PATH):
         os.makedirs(TARGET_PATH)
@@ -68,14 +76,14 @@ def main(argv):
     key_list = []
     tensor_list = []
     value_list = []
-    for single_file_info in tqdm(file_list, ncols=70):
-        target_path = os.path.join(bucket_folder, '{}.npy'.format(single_file_info[0]))
+    for single_key in tqdm(file_key_list, ncols=70):
+        target_path = os.path.join(bucket_folder, '{}.npy'.format(single_key))
         if not os.path.exists(target_path):
             continue
         npy_file = np.load(target_path)
         result_img = Variable(torch.from_numpy(npy_file).unsqueeze(0))
 
-        key_list.append(single_file_info[0])
+        key_list.append(single_key)
         tensor_list.append(result_img)
 
         if len(tensor_list) == BATCH_SIZE:

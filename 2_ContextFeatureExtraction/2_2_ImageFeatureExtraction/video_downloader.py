@@ -16,7 +16,7 @@ import shutil
 #IMAGE_EXT = ['png', 'jpg']
 VIDEO_EXT = ['mp4', 'mpd', 'gif', 'm3u8']
 SUPPORT_VID_FORM = ['gif', 'flv', 'm4a', 'mp4', 'ogg', 'webm']
-CACHE_DIR = './'
+CACHE_DIR = './dataset/video_cache/'
 VIDEO_TEMPLATE = 'youtube-dl {}'
 
 
@@ -29,7 +29,7 @@ def main(argv):
     TO_LINE = int(argv[2])
 
     key_link_dict = {}
-    with open('../../orig_video_link.csv') as f:
+    with open('./dataset/orig_video_link.csv') as f:
         reader = csv.reader(f, delimiter=',')
         for idx, target in enumerate(reader):
             if (idx >= TO_LINE) or (idx < FROM_LINE):
