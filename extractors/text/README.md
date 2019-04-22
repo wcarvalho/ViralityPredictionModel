@@ -28,3 +28,7 @@ source activate bert
 batch_size = 256
 max_char = 280
 Take the very last hidden layer of '[CLS]'
+
+
+## Execute order
+bert_preprocess -> bert_with_feature -> bert_postprocess
