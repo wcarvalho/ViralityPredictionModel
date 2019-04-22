@@ -19,8 +19,11 @@ cd ../
 source activate bert
 ```
 
+
 ## Dataset Folder setting
+
 ./dataset (root folder)
+
 ./checkpoints (current folder) : my code will automatically download checkpoints under this directory
 
 
