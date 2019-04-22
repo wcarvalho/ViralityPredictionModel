@@ -32,4 +32,4 @@ set of rows that contains r_pid, r_uid, r_t, p_pid, p_uid, p_t, c_pid, c_uid, c_
   - for each row, add the length between (r_pid, p_pid)
   - wiener index for tree starting at (r_pid, p_pid, c_id)?
 - Wilka: use negative sampling to use another random batch
-  - 2: better way to shuffle. Yunseok is recommending I change the format of the CSV to a HD5. Use h5py
+  - 2: better way to shuffle. Yunseok is recommending I change the format of the CSV to a HDF5. Use h5py
