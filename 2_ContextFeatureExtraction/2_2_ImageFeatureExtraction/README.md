@@ -12,6 +12,8 @@ conda install pytorch torchvision -c pytorch -y
 pip install requests gpustat tensorboardX visdom ipdb pudb tqdm h5py Pillow
 pip install --upgrade youtube-dl
 ```
+same script can be found in setup.sh
+
 
 ## Dataset Folder setting
 ./dataset (root folder)
@@ -27,3 +29,4 @@ I run the video/image downloader with 16 cores
 image_filter -> image_downloader -> image_preprocess -> image_resnet
 ( -> video_downloader -> ... after image_filter)
 
+One-liner script is at run.sh
