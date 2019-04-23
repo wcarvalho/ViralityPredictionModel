@@ -16,7 +16,7 @@ Same command set can be found in setup.sh
 
 
 ## Dataset Folder setting
-./dataset (root folder)
+./dataset (current folder)
 
 ./resources (current folder)
 
