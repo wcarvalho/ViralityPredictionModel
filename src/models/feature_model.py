@@ -149,11 +149,11 @@ class FeatureModel(nn.Module):
     content_embed = self.ContentEmbedder4Prediction(image, text)
     # add exponent to keep value >=1 for numerical stability
     p_value = self.DepthPrediction(torch.mul(
-      p_embed, content_embed))
+      p_embed, content_embed)).exp()
     c_value = self.DepthPrediction(torch.mul(
-      c_embed, content_embed))
+      c_embed, content_embed)).exp()
     r_value = self.DepthPrediction(torch.mul(
-      r_embed, content_embed))
+      r_embed, content_embed)).exp()
 
     # TARGETs
     target_input = torch.mul(r_embed, content_embed)
@@ -162,7 +162,7 @@ class FeatureModel(nn.Module):
     avg_depth = self.AvgDepthPrediction(target_input)
 
     returning = {k:v for k,v in zip(("p_value", "c_value", "r_value", "tree_size", "max_depth", "avg_depth"),(p_value, c_value, r_value, tree_size, max_depth, avg_depth))}
-    import ipdb; ipdb.set_trace()
+
     for k, v in returning.items():
       try:
         if (v != v).any():

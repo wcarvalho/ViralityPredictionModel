@@ -38,6 +38,7 @@ def load_parser():
   file.add_argument('-k', '--key', type=str, default="root_postID")
   file.add_argument('--data-header', type=str, default=None)
   file.add_argument('--label-header', type=str, default=None)
+  file.add_argument('--align-files', type=int, default=0, help="align files by their name. make sure there's an equal number of files in the image, text, label, and data file sets. ")
 
   # file.add_argument('--max-label-files-open', type=int, default=2)
   # file.add_argument('--max-hfpy-files-open', type=int, default=2)

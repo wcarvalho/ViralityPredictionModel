@@ -196,48 +196,50 @@ class Trainer(object):
       self.model.zero_grad()
       torch.cuda.empty_cache()
 
-      train_loss = self.train_epoch(
-        data_file=train_data_files[epoch % ntrain_files],
-        label_file=train_label_files[epoch % ntrain_files],
-        image_file=train_image_files[epoch % ntrain_files] if train_image_files else None,
-        text_file=train_text_files[epoch % ntrain_files] if train_text_files else None,
-        backprop=True)
+      if ntrain_files:
+        train_loss = self.train_epoch(
+          data_file=train_data_files[epoch % ntrain_files],
+          label_file=train_label_files[epoch % ntrain_files],
+          image_file=train_image_files[epoch % ntrain_files] if train_image_files else None,
+          text_file=train_text_files[epoch % ntrain_files] if train_text_files else None,
+          backprop=True)
 
-      for indx, name in enumerate(self.meter_names):
-        self.train_losses[indx][epoch] = self.meters[name].average
+        for indx, name in enumerate(self.meter_names):
+          self.train_losses[indx][epoch] = self.meters[name].average
 
-      if self.writer:
-        self.write_meters_to_tensorboard(self.meters, "train", epoch)
-      for meter in self.meters: self.meters[meter].reset()
+        if self.writer:
+          self.write_meters_to_tensorboard(self.meters, "train", epoch)
+        for meter in self.meters: self.meters[meter].reset()
 
 
       self.model.eval()
       self.model.zero_grad()
       torch.cuda.empty_cache()
-      with torch.no_grad():
-        valid_loss = self.train_epoch(
-          data_file=valid_data_files[epoch % nvalid_files],
-          label_file=valid_label_files[epoch % nvalid_files],
-          image_file=valid_image_files[epoch % nvalid_files] if valid_image_files else None,
-          text_file=valid_text_files[epoch % nvalid_files] if valid_text_files else None,
-          backprop=False)
-      for indx, name in enumerate(self.meter_names):
-        self.valid_losses[indx][epoch] = self.meters[name].average
+      if nvalid_files:
+        with torch.no_grad():
+          valid_loss = self.train_epoch(
+            data_file=valid_data_files[epoch % nvalid_files],
+            label_file=valid_label_files[epoch % nvalid_files],
+            image_file=valid_image_files[epoch % nvalid_files] if valid_image_files else None,
+            text_file=valid_text_files[epoch % nvalid_files] if valid_text_files else None,
+            backprop=False)
+        for indx, name in enumerate(self.meter_names):
+          self.valid_losses[indx][epoch] = self.meters[name].average
 
-      if self.writer:
-        self.write_meters_to_tensorboard(self.meters, "valid", epoch)
-      for meter in self.meters: self.meters[meter].reset()
+        if self.writer:
+          self.write_meters_to_tensorboard(self.meters, "valid", epoch)
+        for meter in self.meters: self.meters[meter].reset()
 
 
-      if valid_loss < self.min_valid:
-        self.min_valid = valid_loss
-        self.min_epoch = epoch
-        self.patience_used = 0
-        if self.checkpoint_file: self.save_to_ckpt(self.checkpoint_file, epoch=True)
-        note = "NEW MINIMUM"
-      else:
-        self.patience_used += 1
-        note = "patience increased to %d" % self.patience_used
+        if valid_loss < self.min_valid:
+          self.min_valid = valid_loss
+          self.min_epoch = epoch
+          self.patience_used = 0
+          if self.checkpoint_file: self.save_to_ckpt(self.checkpoint_file, epoch=True)
+          note = "NEW MINIMUM"
+        else:
+          self.patience_used += 1
+          note = "patience increased to %d" % self.patience_used
 
 
       if epoch % 5 == 1:
@@ -266,6 +268,7 @@ class Trainer(object):
       image_size=self.image_size,
       dummy_user_vector=self.dummy_user_vector
       )
+
     if len(dataset.data):
       dataloader = DataLoader(dataset, batch_size=self.batch_size,
         shuffle=self.shuffle, num_workers=self.num_workers)
@@ -371,9 +374,9 @@ class Trainer(object):
     avg_depth_loss = F.mse_loss(pred_avg_depth, avg_depth.float().log())
     target_loss = tree_size_loss + max_depth_loss + avg_depth_loss
 
-    print("\npred_tree_size", pred_tree_size)
-    print("\npred_max_depth", pred_max_depth)
-    print("\npred_avg_depth", pred_avg_depth)
+    # print("\npred_tree_size", pred_tree_size)
+    # print("\npred_max_depth", pred_max_depth)
+    # print("\npred_avg_depth", pred_avg_depth)
     if (target_loss!=target_loss).any():
       print("target_loss has nan")
       import ipdb; ipdb.set_trace()
@@ -526,9 +529,11 @@ def main():
   verbosity=args['verbosity']
   save_frequency=args['save_frequency']
 
-  train_data_files, train_image_files, train_text_files, train_label_files = get_overlapping_data_files(train_data_files, train_image_files, train_text_files, train_label_files)
+  if args['align_files']:
+    train_data_files, train_image_files, train_text_files, train_label_files = get_overlapping_data_files(train_data_files, train_image_files, train_text_files, train_label_files)
 
-  valid_data_files, valid_image_files, valid_text_files, valid_label_files = get_overlapping_data_files(valid_data_files, valid_image_files, valid_text_files, valid_label_files)
+  if args['align_files']:
+    valid_data_files, valid_image_files, valid_text_files, valid_label_files = get_overlapping_data_files(valid_data_files, valid_image_files, valid_text_files, valid_label_files)
 
   device = torch.device("cpu" if (args['no_cuda'] or not torch.cuda.is_available()) else "cuda")
 
