@@ -20,19 +20,19 @@ source activate bert
 ```
 
 
-## Dataset Folder setting
+## Dataset Folder Setting
 
 ./dataset (current folder)
 
 ./checkpoints (current folder) : my code will automatically download checkpoints under this directory
 
 
-## Specific details
+## Specific Details
 batch_size = 256
 max_char = 280
 Take the very last hidden layer of '[CLS]'
 
 
-## Execute order
+## Order of Execution
 bert_preprocess -> bert_with_feature -> bert_postprocess
 (one liner script: run.sh)
