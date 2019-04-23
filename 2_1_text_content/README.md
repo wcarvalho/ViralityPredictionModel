@@ -1,4 +1,4 @@
-# BERT-based tokenizer
+# BERT-based Feature Embedding Extractor
 
 ## Environment Setup for BERT Extractor: same as ./setup.sh file
 ```
