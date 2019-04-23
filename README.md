@@ -8,7 +8,8 @@
 ## Input data for our model
 
 ### 1. Graph
-It consists of a set of rows that contains r_pid, r_uid, r_t, p_pid, p_uid, p_t, c_pid, c_uid, c_t (where r=root, p=parent, c=child, pid=post_id, uid=user_id, t=timestamp)
+- Consists of a set of rows that contains r_pid, r_uid, r_t, p_pid, p_uid, p_t, c_pid, c_uid, c_t 
+  (r=root, p=parent, c=child, pid=post_id, uid=user_id, t=timestamp)
 
 
 ### 2. Text 
