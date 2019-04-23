@@ -2,7 +2,7 @@
 
 ## Structure of the repository
 - We put number for each subtask in chronological order. The data pipeline flows from 1 to 3.
-- In each folder, there is 'run.sh' file. You can run each part of the codes just by executing it.
+- In each folder, there is **'run.sh' (not MAKEFILE)** file. You can run each part of the codes just by executing it.
 
 
 ## Input data for our model
