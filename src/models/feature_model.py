@@ -46,6 +46,7 @@ class JointContentEmbedder(nn.Module):
   def forward(self, image_content=None, text_content=None):
     have_text = tensor_is_set(text_content)
     have_image = tensor_is_set(image_content)
+
     if have_image:
       image_embedding = self.image_embedder(image_content)
       # image_gate = self.image_gate(image_embedding)
@@ -71,9 +72,9 @@ class FeatureModel(nn.Module):
 
     self.ContentEmbedder4Prediction = JointContentEmbedder(image_embed_size, text_embed_size, hidden_size, joint_embedding_size, n_hidden=4)
     
-    self.StartUserEmbedder = NeuralNetwork(user_size, joint_embedding_size, 1, n_hidden=4)
+    self.StartUserEmbedder = NeuralNetwork(user_size, hidden_size, joint_embedding_size, n_hidden=4)
 
-    self.FollowerUserEmbedder = NeuralNetwork(user_size, joint_embedding_size, 1, n_hidden=4)
+    self.FollowerUserEmbedder = NeuralNetwork(user_size, hidden_size, joint_embedding_size, n_hidden=4)
 
     self.FollowingPredictor = nn.Sequential(
       NeuralNetwork(joint_embedding_size, hidden_size, 1, n_hidden=1),
@@ -123,6 +124,7 @@ class FeatureModel(nn.Module):
     returning = {k:v for k,v in zip(("p_followed_true", "p_followed_false"),(p_followed_true, torch.cat(p_followed_false)))}
 
 
+
     for k, v in returning.items():
       if (v != v).any():
         print(k)
@@ -134,7 +136,6 @@ class FeatureModel(nn.Module):
     # in case there are nans, set values to 0!!!
     text[(text != text)] = 0  
     image[(image != image)] = 0  
-
 
     r_embed = self.StartUserEmbedder(r_vector)
     p_embed = self.StartUserEmbedder(p_vector)
@@ -148,11 +149,11 @@ class FeatureModel(nn.Module):
     content_embed = self.ContentEmbedder4Prediction(image, text)
     # add exponent to keep value >=1 for numerical stability
     p_value = self.DepthPrediction(torch.mul(
-      p_embed, content_embed)).exp()
+      p_embed, content_embed))
     c_value = self.DepthPrediction(torch.mul(
-      c_embed, content_embed)).exp()
+      c_embed, content_embed))
     r_value = self.DepthPrediction(torch.mul(
-      r_embed, content_embed)).exp()
+      r_embed, content_embed))
 
     # TARGETs
     target_input = torch.mul(r_embed, content_embed)
@@ -161,7 +162,7 @@ class FeatureModel(nn.Module):
     avg_depth = self.AvgDepthPrediction(target_input)
 
     returning = {k:v for k,v in zip(("p_value", "c_value", "r_value", "tree_size", "max_depth", "avg_depth"),(p_value, c_value, r_value, tree_size, max_depth, avg_depth))}
-
+    import ipdb; ipdb.set_trace()
     for k, v in returning.items():
       try:
         if (v != v).any():

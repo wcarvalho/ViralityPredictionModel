@@ -15,7 +15,6 @@ from tensorboardX import SummaryWriter
 from data.twitter_chunk import TwitterDatasetChunk
 from data.utils import get_overlapping_data_files
 
-from src.models.feature_model import FeatureModel
 from src.utils import path_exists, filepath_exists, AverageMeter, tensor_is_set
 
 EPS = 1e-12
@@ -32,7 +31,7 @@ def negative_sampling_loss(positive, negative):
   true = torch.cat([torch.ones_like(positive), torch.zeros_like(negative)], dim=-1)
 
   # don't normalize yet
-  loss = F.binary_cross_entropy_with_logits(pred, true, reduction='none')
+  loss = F.binary_cross_entropy(pred, true, reduction='none')
 
   # sum over columns and do mean over batch
   loss = loss.sum(dim=-1).mean()
@@ -45,7 +44,6 @@ def depth_loss(r_value, p_value, c_value, rc_length):
     error = "Why is any length between root and child below zero?"
     import ipdb; ipdb.set_trace()
     raise (error)
-
 
   r_log = (r_value+EPS).log()
   p_log = (p_value+EPS).log()
@@ -60,7 +58,7 @@ def depth_loss(r_value, p_value, c_value, rc_length):
   return rc_loss, rp_loss, pc_loss
 
 def match_sizes(batch_1, batch_2):
-  """For whichever batch is smaller. keep repeating its elements until you"""
+  """For whichever batch is smaller. keep repeating its elements until they match"""
 
   num_times = 0
   if len(batch_2) < len(batch_1):
@@ -92,6 +90,8 @@ class Trainer(object):
     text_size,
     image_size,
     dummy_user_vector=False,
+    user_only=False,
+    content_only=False,
     seed=1,
     micro_lambda=1,
     macro_lambda=1,
@@ -115,6 +115,8 @@ class Trainer(object):
     self.text_size = text_size
     self.image_size = image_size
     self.dummy_user_vector = dummy_user_vector
+    self.user_only = user_only
+    self.content_only = content_only
     self.seed = seed
     self.micro_lambda = micro_lambda
     self.macro_lambda = macro_lambda
@@ -193,7 +195,13 @@ class Trainer(object):
       self.model.train()
       self.model.zero_grad()
       torch.cuda.empty_cache()
-      train_loss = self.train_epoch([train_data_files[epoch % ntrain_files]], [train_image_files[epoch % ntrain_files]], [train_text_files[epoch % ntrain_files]], [train_label_files[epoch % ntrain_files]], backprop=True)
+
+      train_loss = self.train_epoch(
+        data_file=train_data_files[epoch % ntrain_files],
+        label_file=train_label_files[epoch % ntrain_files],
+        image_file=train_image_files[epoch % ntrain_files] if train_image_files else None,
+        text_file=train_text_files[epoch % ntrain_files] if train_text_files else None,
+        backprop=True)
 
       for indx, name in enumerate(self.meter_names):
         self.train_losses[indx][epoch] = self.meters[name].average
@@ -207,7 +215,12 @@ class Trainer(object):
       self.model.zero_grad()
       torch.cuda.empty_cache()
       with torch.no_grad():
-        valid_loss = self.train_epoch([valid_data_files[epoch % nvalid_files]], [valid_image_files[epoch % nvalid_files]], [valid_text_files[epoch % nvalid_files]], [valid_label_files[epoch % nvalid_files]], backprop=False)
+        valid_loss = self.train_epoch(
+          data_file=valid_data_files[epoch % nvalid_files],
+          label_file=valid_label_files[epoch % nvalid_files],
+          image_file=valid_image_files[epoch % nvalid_files] if valid_image_files else None,
+          text_file=valid_text_files[epoch % nvalid_files] if valid_text_files else None,
+          backprop=False)
       for indx, name in enumerate(self.meter_names):
         self.valid_losses[indx][epoch] = self.meters[name].average
 
@@ -235,34 +248,29 @@ class Trainer(object):
 
       pbar.set_description("Epoch %d. Train loss=%.2f, Valid loss = %.2f. %s" % (epoch, train_loss, valid_loss, note))
 
-  def train_epoch(self, data_files, image_files, text_files, label_files, backprop=False):
+  def train_epoch(self, data_file, label_file, image_file=None, text_file=None, backprop=False):
 
-    pbar = tqdm(zip(data_files, image_files, text_files, label_files), total=len(data_files))
-    pbar.set_description("iter=0. target: 0, follow: 0, recur: 0")
 
     total_batch_indx = 0
     epoch_loss = 0
-    for file_indx, (data_file, image_file, text_file, label_file) in enumerate(pbar):
-      dataset = TwitterDatasetChunk(
-        data_file=data_file,
-        image_file=image_file,
-        text_file=text_file,
-        label_file=label_file,
-        key=self.key,
-        data_header=self.data_header,
-        label_header=self.label_header,
-        user_size=self.user_size,
-        text_size=self.text_size,
-        image_size=self.image_size,
-        dummy_user_vector=self.dummy_user_vector
-        )
-      if not len(dataset.data):
-        # empty dataset for some reason? continue
-        continue
+    dataset = TwitterDatasetChunk(
+      data_file=data_file,
+      image_file=image_file,
+      text_file=text_file,
+      label_file=label_file,
+      key=self.key,
+      data_header=self.data_header,
+      label_header=self.label_header,
+      user_size=self.user_size,
+      text_size=self.text_size,
+      image_size=self.image_size,
+      dummy_user_vector=self.dummy_user_vector
+      )
+    if len(dataset.data):
       dataloader = DataLoader(dataset, batch_size=self.batch_size,
         shuffle=self.shuffle, num_workers=self.num_workers)
 
-      for batch_indx, batch in enumerate(dataloader):
+      for batch_indx, batch in enumerate(tqdm(dataloader, "Batch")):
         if batch_indx == 0:
           # initalize things at first batch
           # batch_0 = batch
@@ -295,18 +303,10 @@ class Trainer(object):
               # if commented, stores average over __long__ horizon
               for meter in self.batch_meters: self.batch_meters[meter].reset()
 
-
-        # ----- Set pbar/tqdm description --- 
-        pbar.set_description("iter=%d. target: %.2f, follow: %.2f, recur: %.2f" % (
-          self.iteration,
-          self.meters['target_loss'].average,
-          self.meters['negative_sampling_loss'].average,
-          self.meters['rc_loss'].average + self.meters['rp_loss'].average + self.meters['pc_loss'].average
-          ))
         total_batch_indx += 1
 
 
-      dataset.close()
+    dataset.close()
     # for last instance, use batch 0 as the "random" batch
     # epoch_loss += self.train_instance(train_batch=batch_2, random_batch=batch_0)
 
@@ -344,12 +344,26 @@ class Trainer(object):
     if self.verbosity > 1: tqdm.write("\tput data on device")
 
     # ---- Compute outputs ---
-    p_followed_true, p_followed_false, p_value, c_value, r_value, pred_tree_size, pred_max_depth, pred_avg_depth = self.model(r_vector, p_vector, c_vector, r_vector_other, p_vector_other, c_vector_other, image_data, text_data)
+    if self.user_only and self.content_only:
+      raise NotImplementedError("What does user_only and content_only mean?")
+    elif self.user_only:
+      p_followed_true, p_followed_false, p_value, c_value, r_value, pred_tree_size, pred_max_depth, pred_avg_depth = self.model(r_vector, p_vector, c_vector, r_vector_other, p_vector_other, c_vector_other)
+    elif self.content_only:
+      pred_tree_size, pred_max_depth, pred_avg_depth = self.model(image_data, text_data)
+    else:
+      p_followed_true, p_followed_false, p_value, c_value, r_value, pred_tree_size, pred_max_depth, pred_avg_depth = self.model(r_vector, p_vector, c_vector, r_vector_other, p_vector_other, c_vector_other, image_data, text_data)
+
     if self.verbosity > 1: tqdm.write("\trun model over data")
 
+    # import ipdb; ipdb.set_trace()
     # ---- Compute Losses ---
-    p_follow_loss = negative_sampling_loss(p_followed_true, p_followed_false)
-    rc_loss, rp_loss, pc_loss = depth_loss(r_value, p_value, c_value, rc_length.float())
+    p_follow_loss=torch.tensor(0)
+    rc_loss=torch.tensor(0)
+    rp_loss=torch.tensor(0)
+    pc_loss=torch.tensor(0)
+    if not self.content_only:
+      p_follow_loss = negative_sampling_loss(p_followed_true, p_followed_false)
+      rc_loss, rp_loss, pc_loss = depth_loss(r_value, p_value, c_value, rc_length.float())
     recursive_loss = rc_loss + rp_loss + pc_loss
 
     tree_size_loss = F.mse_loss(pred_tree_size, tree_size.float().log())
@@ -357,17 +371,13 @@ class Trainer(object):
     avg_depth_loss = F.mse_loss(pred_avg_depth, avg_depth.float().log())
     target_loss = tree_size_loss + max_depth_loss + avg_depth_loss
 
+    print("\npred_tree_size", pred_tree_size)
+    print("\npred_max_depth", pred_max_depth)
+    print("\npred_avg_depth", pred_avg_depth)
     if (target_loss!=target_loss).any():
       print("target_loss has nan")
       import ipdb; ipdb.set_trace()
 
-    if (p_follow_loss!=p_follow_loss).any():
-      print("p_follow_loss has nan")
-      import ipdb; ipdb.set_trace()
-
-    if (recursive_loss!=recursive_loss).any():
-      print("recursive_loss has nan")
-      import ipdb; ipdb.set_trace()
     total_loss = target_loss + self.micro_lambda*p_follow_loss + self.macro_lambda*recursive_loss
     if self.verbosity > 1: tqdm.write("\tcomputed losses")
 
@@ -522,11 +532,30 @@ def main():
 
   device = torch.device("cpu" if (args['no_cuda'] or not torch.cuda.is_available()) else "cuda")
 
-  model = FeatureModel(user_size=args['user_size'],
-    image_embed_size=args['image_size'],
-    text_embed_size=args['text_size'],
-    hidden_size=args['hidden_size'],
-    joint_embedding_size=args['joint_embedding_size'])
+  if args['user_only'] and args['content_only']:
+    raise NotImplementedError("What does user_only and content_only mean?")
+  elif args['user_only']:
+    from src.models.user_model import UserModel
+    model = UserModel(
+      user_size=args['user_size'],
+      hidden_size=args['hidden_size'],
+      joint_embedding_size=args['joint_embedding_size'])
+  elif args['content_only']:
+    from src.models.content_model import ContentModel
+    model = ContentModel(
+      image_embed_size=args['image_size'],
+      text_embed_size=args['text_size'],
+      hidden_size=args['hidden_size'],
+      joint_embedding_size=args['joint_embedding_size'])
+
+  else:
+    from src.models.feature_model import FeatureModel
+    model = FeatureModel(
+      user_size=args['user_size'],
+      image_embed_size=args['image_size'],
+      text_embed_size=args['text_size'],
+      hidden_size=args['hidden_size'],
+      joint_embedding_size=args['joint_embedding_size'])
 
 
   if (torch.cuda.device_count() > 1) and args['all_gpu']:
@@ -550,6 +579,8 @@ def main():
     text_size=text_size,
     image_size=image_size,
     dummy_user_vector=dummy_user_vector,
+    user_only=args['user_only'],
+    content_only=args['content_only'],
     seed=seed,
     micro_lambda=micro_lambda,
     macro_lambda=macro_lambda,

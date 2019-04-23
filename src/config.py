@@ -54,6 +54,8 @@ def load_parser():
   training.add_argument('-lr', '--learning-rate', type=float, default=1e-3)
   training.add_argument('--no-cuda', action='store_true', default=False)
   training.add_argument('--all-gpu', type=int, default=0, choices=[0,1])
+  training.add_argument('--user-only', type=int, default=0, choices=[0,1])
+  training.add_argument('--content-only', type=int, default=0, choices=[0,1])
   training.add_argument('--shuffle', type=int, default=1, choices=[0,1])
   training.add_argument('--target', type=str, default='tree_size', choices=['tree_size', 'max_depth', 'avg_depth'])
 
