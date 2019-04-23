@@ -11,16 +11,7 @@
 It consists of a set of rows that contains r_pid, r_uid, r_t, p_pid, p_uid, p_t, c_pid, c_uid, c_t (where r=root, p=parent, c=child, pid=post_id, uid=user_id, t=timestamp)
 
 
-### 2. Image 
-
-- HDF5 Data format: key=r_pid, value={"img(or vid)": image or video_vector}
-- Features are extracted from ResNet-152
-- Dim for each vector: 2048 (final fully-connected layer before the last one)
-- Pass through four layers of NN in '3_train_model'
-
-
-### 3. Text 
-
+### 2. Text 
 
 - HDF5 Data format: key=r_pid, value={"text": text_vector} 
 - Extracted from BERT (Specific model name: bert-base-multilingual-cased)
@@ -28,4 +19,10 @@ It consists of a set of rows that contains r_pid, r_uid, r_t, p_pid, p_uid, p_t,
 - Pass through four layers of NN in '3_train_model'
 
 
+### 3. Image 
+
+- HDF5 Data format: key=r_pid, value={"img(or vid)": image or video_vector}
+- Features are extracted from ResNet-152
+- Dim for each vector: 2048 (final fully-connected layer before the last one)
+- Pass through four layers of NN in '3_train_model'
 
