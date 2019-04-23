@@ -22,7 +22,7 @@ source activate bert
 
 ## Dataset Folder setting
 
-./dataset (root folder)
+./dataset (current folder)
 
 ./checkpoints (current folder) : my code will automatically download checkpoints under this directory
 
