@@ -1,6 +1,6 @@
 # BERT-based tokenizer
 
-## Environment Setup for BERT Extractor
+## Environment Setup for BERT Extractor: same as ./setup.sh file
 ```
 conda create --name bert -y
 source activate bert
@@ -19,12 +19,20 @@ cd ../
 source activate bert
 ```
 
+
 ## Dataset Folder setting
-../../dataset (root folder)
-./checkpoints (current folder)
+
+./dataset (root folder)
+
+./checkpoints (current folder) : my code will automatically download checkpoints under this directory
 
 
 ## Specific details
 batch_size = 256
 max_char = 280
 Take the very last hidden layer of '[CLS]'
+
+
+## Execute order
+bert_preprocess -> bert_with_feature -> bert_postprocess
+(one liner script: run.sh)

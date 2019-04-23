@@ -39,7 +39,7 @@ def main(argv):
                                               do_basic_tokenize=True,
                                               cache_dir='./checkpoints/')
     id_word_list = []
-    with open('../../dataset/orig_text_segment{}'.format(SPLIT_NO)) as f:
+    with open('./dataset/orig_text_segment{}'.format(SPLIT_NO)) as f:
         reader = csv.reader(f, delimiter=',')
         for target in tqdm(reader, ncols=60, total=11500000):
             key = int(target[0])
@@ -64,7 +64,7 @@ def main(argv):
             #    break
 
 
-    base_dir = '../../dataset/feature_text_segment{}'.format(SPLIT_NO)
+    base_dir = './dataset/feature_text_segment{}'.format(SPLIT_NO)
     os.makedirs(base_dir)
 
     for idx in trange(((len(id_word_list) + BATCH_SIZE - 1) // BATCH_SIZE), ncols=60):
